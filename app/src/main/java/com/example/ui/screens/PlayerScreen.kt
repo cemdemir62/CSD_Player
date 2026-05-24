@@ -106,7 +106,7 @@ fun PlayerScreen(
     var sleepTimerRemainingSec by remember { mutableStateOf(0L) }
 
     // Akıllı Kategori İçi Zapping (Zap-lock within Category) Durumu ve Yardımcı Fonksiyonu
-    val sharedPrefs = remember(context) { context.getSharedPreferences("iptv_settings", android.content.Context.MODE_PRIVATE) }
+    val sharedPrefs = remember(context) { context.getSharedPreferences("zula_iptv_prefs", android.content.Context.MODE_PRIVATE) }
     var zapLockCategory by remember {
         mutableStateOf(sharedPrefs.getBoolean("zap_lock_category", false))
     }
@@ -232,6 +232,17 @@ fun PlayerScreen(
         val mediaItem = MediaItem.fromUri(channel.streamUrl)
         exoPlayer.setMediaItem(mediaItem)
         exoPlayer.prepare()
+        
+        // Kaldığı yerden devam etme (Resume position for VOD: MOVIE or SERIES)
+        if (channel.type != "LIVE") {
+            val savedPosKey = "resume_pos_${channel.uniqueId}"
+            val savedPos = sharedPrefs.getLong(savedPosKey, 0L)
+            if (savedPos > 0L) {
+                exoPlayer.seekTo(savedPos)
+                position = savedPos
+            }
+        }
+        
         exoPlayer.play()
         exoPlayer.setPlaybackSpeed(playbackSpeed)
     }
@@ -241,13 +252,29 @@ fun PlayerScreen(
         exoPlayer.setPlaybackSpeed(playbackSpeed)
     }
 
-    // VOD yayınlar için ilerleme saniye takibi
+    // VOD yayınlar için ilerleme saniye takibi ve kaldığı yeri kaydetme
     LaunchedEffect(isPlaying, channel) {
         if (channel.type != "LIVE") {
-            while (true) {
-                position = exoPlayer.currentPosition
-                duration = exoPlayer.duration.coerceAtLeast(0L)
-                delay(1000)
+            try {
+                while (true) {
+                    val pos = exoPlayer.currentPosition
+                    val dur = exoPlayer.duration.coerceAtLeast(0L)
+                    position = pos
+                    duration = dur
+                    
+                    if (pos > 0L) {
+                        sharedPrefs.edit().putLong("resume_pos_${channel.uniqueId}", pos).apply()
+                    }
+                    delay(1000)
+                }
+            } finally {
+                // Ekrana veda ederken veya kanal değişirken son pozisyonu hızlıca kaydet
+                try {
+                    val pos = exoPlayer.currentPosition
+                    if (pos > 0L) {
+                        sharedPrefs.edit().putLong("resume_pos_${channel.uniqueId}", pos).apply()
+                    }
+                } catch (e: Exception) {}
             }
         }
     }
@@ -494,6 +521,50 @@ fun PlayerScreen(
                     if (isTvMode) {
                         isFocusable = true
                         isFocusableInTouchMode = true
+                        setOnKeyListener { _, keyCode, event ->
+                            if (event.action == android.view.KeyEvent.ACTION_DOWN) {
+                                when (keyCode) {
+                                    android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+                                    android.view.KeyEvent.KEYCODE_ENTER,
+                                    android.view.KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                                        if (!isControllerFullyVisible) {
+                                            showController()
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    }
+                                    android.view.KeyEvent.KEYCODE_BACK,
+                                    android.view.KeyEvent.KEYCODE_ESCAPE -> {
+                                        if (isControllerFullyVisible) {
+                                            hideController()
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    }
+                                    android.view.KeyEvent.KEYCODE_DPAD_UP -> {
+                                        if (!isControllerFullyVisible) {
+                                            performZapping(false)
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    }
+                                    android.view.KeyEvent.KEYCODE_DPAD_DOWN -> {
+                                        if (!isControllerFullyVisible) {
+                                            performZapping(true)
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    }
+                                    else -> false
+                                }
+                            } else {
+                                false
+                            }
+                        }
                         requestFocus()
                     }
                 }

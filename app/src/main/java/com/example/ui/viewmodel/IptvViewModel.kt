@@ -116,7 +116,7 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
         if (channel != null) {
             val playlist = _selectedPlaylist.value
             if (playlist != null && playlist.type == "XTREAM") {
-                fetchSeriesInfo(playlist, channel.channelId)
+                fetchSeriesInfo(playlist, channel)
             }
         }
     }
@@ -125,7 +125,8 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
         _selectedSeasonNum.value = num
     }
 
-    private fun fetchSeriesInfo(playlist: Playlist, seriesId: String) {
+    private fun fetchSeriesInfo(playlist: Playlist, channel: IptvChannel) {
+        val seriesId = channel.channelId
         viewModelScope.launch {
             _isFetchingSeriesInfo.value = true
             _seriesFetchError.value = null
@@ -201,8 +202,11 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     _seriesEpisodes.value = epMap
                     
-                    // Set default season to first available
-                    if (seasonsList.isNotEmpty()) {
+                    // Set default season to last watched season or first available
+                    val savedSeasonNum = sharedPrefs.getInt("series_${channel.uniqueId}_last_season", -1)
+                    if (savedSeasonNum != -1 && seasonsList.any { it.seasonNumber == savedSeasonNum }) {
+                        _selectedSeasonNum.value = savedSeasonNum
+                    } else if (seasonsList.isNotEmpty()) {
                         _selectedSeasonNum.value = seasonsList.first().seasonNumber
                     } else {
                         _selectedSeasonNum.value = 1

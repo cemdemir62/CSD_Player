@@ -31,6 +31,7 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.example.data.model.IptvChannel
 import com.example.data.model.XtreamEpisode
+import androidx.compose.foundation.BorderStroke
 import com.example.data.model.XtreamSeason
 import com.example.ui.theme.NetflixDarkGrey
 import com.example.ui.theme.NetflixLightGrey
@@ -46,6 +47,7 @@ fun SeriesDetailOverlay(
     isLoading: Boolean,
     error: String?,
     isTvMode: Boolean,
+    lastWatchedEpisodeId: String?,
     onSeasonSelected: (Int) -> Unit,
     onEpisodeSelected: (XtreamSeason, XtreamEpisode) -> Unit,
     onClose: () -> Unit
@@ -262,10 +264,12 @@ fun SeriesDetailOverlay(
                                             verticalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
                                             items(activeEpisodes) { episode ->
+                                                val isLastWatched = episode.id == lastWatchedEpisodeId
                                                 EpisodeRowItem(
                                                     episode = episode,
                                                     seriesLogoUrl = series.logoUrl,
                                                     isTvMode = isTvMode,
+                                                    isLastWatched = isLastWatched,
                                                     onClick = {
                                                         val seasonObj = activeSeason ?: XtreamSeason(
                                                             "Sezon ${selectedSeasonNum}",
@@ -351,10 +355,12 @@ fun SeriesDetailOverlay(
                                             verticalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
                                             items(activeEpisodes) { episode ->
+                                                val isLastWatched = episode.id == lastWatchedEpisodeId
                                                 EpisodeRowItem(
                                                     episode = episode,
                                                     seriesLogoUrl = series.logoUrl,
                                                     isTvMode = isTvMode,
+                                                    isLastWatched = isLastWatched,
                                                     onClick = {
                                                         val seasonObj = activeSeason ?: XtreamSeason(
                                                             "Sezon ${selectedSeasonNum}",
@@ -381,11 +387,13 @@ fun EpisodeRowItem(
     episode: XtreamEpisode,
     seriesLogoUrl: String?,
     isTvMode: Boolean,
+    isLastWatched: Boolean,
     onClick: () -> Unit
 ) {
     Surface(
         shape = RoundedCornerShape(8.dp),
-        color = Color(0xFF1E1E1E),
+        color = if (isLastWatched) Color(0xFF2C1E1E) else Color(0xFF1E1E1E),
+        border = if (isLastWatched) BorderStroke(1.dp, NetflixRed) else null,
         modifier = Modifier
             .fillMaxWidth()
             .tvClickable(isTvMode = isTvMode, shape = RoundedCornerShape(8.dp)) { onClick() }
@@ -441,19 +449,42 @@ fun EpisodeRowItem(
 
             // Text Details on the RIGHT
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "${episode.episodeNum}. Bölüm: ${episode.name}",
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${episode.episodeNum}. Bölüm: ${episode.name}",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (isLastWatched) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = NetflixRed,
+                            modifier = Modifier.padding(end = 4.dp)
+                        ) {
+                            Text(
+                                text = "KALDIĞIN YER",
+                                color = Color.White,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Black,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Bölümü Oynat",
-                    color = Color.Gray,
-                    fontSize = 10.sp
+                    text = if (isLastWatched) "Son izlenen bölüm - Kaldığın yerden izle" else "Bölümü Oynat",
+                    color = if (isLastWatched) NetflixRed else Color.Gray,
+                    fontSize = 10.sp,
+                    fontWeight = if (isLastWatched) FontWeight.Bold else FontWeight.Normal
                 )
             }
         }

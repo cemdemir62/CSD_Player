@@ -7,6 +7,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Scaffold
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -169,6 +172,12 @@ class MainActivity : ComponentActivity() {
 
                                 // Dizi Detay & Bölüm Seçim Ekranı Overlay'i
                                 activeSeriesChannel?.let { series ->
+                                    val context = LocalContext.current
+                                    val sharedPrefs = remember(context) { context.getSharedPreferences("zula_iptv_prefs", android.content.Context.MODE_PRIVATE) }
+                                    var lastWatchedEpisodeId by remember(series.uniqueId) {
+                                        mutableStateOf(sharedPrefs.getString("series_${series.uniqueId}_last_episode_id", null))
+                                    }
+
                                     val seasons by viewModel.seriesSeasons.collectAsState()
                                     val episodes by viewModel.seriesEpisodes.collectAsState()
                                     val selectedSeasonNum by viewModel.selectedSeasonNum.collectAsState()
@@ -183,10 +192,19 @@ class MainActivity : ComponentActivity() {
                                         isLoading = isFetchingSeries,
                                         error = seriesFetchError,
                                         isTvMode = isTv,
+                                        lastWatchedEpisodeId = lastWatchedEpisodeId,
                                         onSeasonSelected = { seasonNum ->
                                             viewModel.selectSeasonNum(seasonNum)
                                         },
                                         onEpisodeSelected = { seasonObj, episode ->
+                                            // Kaldığı bölümü ve sezonu kaydet (Resume info)
+                                            sharedPrefs.edit()
+                                                .putInt("series_${series.uniqueId}_last_season", seasonObj.seasonNumber)
+                                                .putString("series_${series.uniqueId}_last_episode_id", episode.id)
+                                                .apply()
+
+                                            lastWatchedEpisodeId = episode.id
+
                                             // Bölüm geçici bir IptvChannel olarak oynatılır
                                             val tempEpisodeChannel = IptvChannel(
                                                 uniqueId = "${selectedPlaylist!!.id}_episode_${episode.id}",
