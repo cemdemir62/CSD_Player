@@ -165,6 +165,9 @@ fun PlayerScreen(
     // HUD / Kontroller Görünürlüğü
     var showControls by remember { mutableStateOf(true) }
 
+    // PlayerView referansı
+    var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
+
     // Kumanda D-Pad Dinleme Alanı (Görsel odaksız klavye dinleme)
     val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
 
@@ -320,30 +323,26 @@ fun PlayerScreen(
         }
     }
 
-    // Dynamic TV Focus Steering
+    // Dynamic TV Focus Steering only on Mobile/Tablet
     LaunchedEffect(showControls) {
-        if (isTvMode) {
-            if (showControls) {
-                delay(150)
-                try {
-                    playPauseFocusRequester.requestFocus()
-                } catch (e: Exception) {
-                    // Focus request failed
-                }
-            } else {
-                focusRequester.requestFocus()
+        if (!isTvMode && showControls) {
+            delay(150)
+            try {
+                playPauseFocusRequester.requestFocus()
+            } catch (e: Exception) {
+                // Focus request failed
             }
         }
     }
 
-    // Focus on startup to receive volume and D-Pad key events properly
-    LaunchedEffect(Unit) {
+    // Direct TV remote focus to ExoPlayer's native PlayerView, or fallback to custom on Mobile
+    LaunchedEffect(playerViewRef) {
         if (isTvMode) {
-            delay(200)
-            try {
-                playPauseFocusRequester.requestFocus()
-            } catch (e: Exception) {
-                focusRequester.requestFocus()
+            delay(400)
+            playerViewRef?.let {
+                it.isFocusable = true
+                it.isFocusableInTouchMode = true
+                it.requestFocus()
             }
         } else {
             focusRequester.requestFocus()
@@ -354,98 +353,121 @@ fun PlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .focusRequester(focusRequester)
-            .focusable()
+            .then(
+                if (!isTvMode) {
+                    Modifier
+                        .focusRequester(focusRequester)
+                        .focusable()
+                } else {
+                    Modifier
+                }
+            )
             .onPreviewKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown) {
-                    when (keyEvent.key) {
-                        Key.MediaPlay -> {
-                            exoPlayer.play()
-                            true
-                        }
-                        Key.MediaPause -> {
-                            exoPlayer.pause()
-                            true
-                        }
-                        Key.MediaPlayPause -> {
-                            if (isPlaying) exoPlayer.pause() else exoPlayer.play()
-                            true
-                        }
-                        Key.MediaFastForward -> {
-                            if (channel.type != "LIVE") {
-                                seekForwardCustom()
-                                showControls = true
-                            }
-                            true
-                        }
-                        Key.MediaRewind -> {
-                            if (channel.type != "LIVE") {
-                                seekBackCustom()
-                                showControls = true
-                            }
-                            true
-                        }
-                        Key.MediaNext -> {
-                            performZapping(true)
-                            showControls = true
-                            true
-                        }
-                        Key.MediaPrevious -> {
-                            performZapping(false)
-                            showControls = true
-                            true
-                        }
-                        else -> {
-                            if (showControls) {
-                                // When controls are visible, we allow focus navigation to find and highlight target buttons.
-                                // However, we intercept ESC/BACK to close/hide the controls overlay safely.
-                                if (keyEvent.key == Key.Escape || keyEvent.key == Key.Back) {
-                                    showControls = false
-                                    focusRequester.requestFocus()
-                                    true
-                                } else {
-                                    false
-                                }
+                    if (isTvMode) {
+                        if (keyEvent.key == Key.Back || keyEvent.key == Key.Escape) {
+                            val pView = playerViewRef
+                            if (pView != null && pView.isControllerFullyVisible) {
+                                pView.hideController()
+                                true
                             } else {
-                                // When controls are hidden, pressing directional keys executes simple quick actions.
-                                when (keyEvent.key) {
-                                    Key.DirectionUp -> {
-                                        performZapping(false)
-                                        showControls = true
+                                scope.launch { onBack() }
+                                true
+                            }
+                        } else {
+                            // Let native PlayerView process all DPAD and media remote keys natively
+                            false
+                        }
+                    } else {
+                        when (keyEvent.key) {
+                            Key.MediaPlay -> {
+                                exoPlayer.play()
+                                true
+                            }
+                            Key.MediaPause -> {
+                                exoPlayer.pause()
+                                true
+                            }
+                            Key.MediaPlayPause -> {
+                                if (isPlaying) exoPlayer.pause() else exoPlayer.play()
+                                true
+                            }
+                            Key.MediaFastForward -> {
+                                if (channel.type != "LIVE") {
+                                    seekForwardCustom()
+                                    showControls = true
+                                }
+                                true
+                            }
+                            Key.MediaRewind -> {
+                                if (channel.type != "LIVE") {
+                                    seekBackCustom()
+                                    showControls = true
+                                }
+                                true
+                            }
+                            Key.MediaNext -> {
+                                performZapping(true)
+                                showControls = true
+                                true
+                            }
+                            Key.MediaPrevious -> {
+                                performZapping(false)
+                                showControls = true
+                                true
+                            }
+                            else -> {
+                                if (showControls) {
+                                    // When controls are visible, we allow focus navigation to find and highlight target buttons.
+                                    // However, we intercept ESC/BACK to close/hide the controls overlay safely.
+                                    if (keyEvent.key == Key.Escape || keyEvent.key == Key.Back) {
+                                        showControls = false
+                                        focusRequester.requestFocus()
                                         true
+                                    } else {
+                                        false
                                     }
-                                    Key.DirectionDown -> {
-                                        performZapping(true)
-                                        showControls = true
-                                        true
-                                    }
-                                    Key.DirectionLeft -> {
-                                        if (channel.type != "LIVE") {
-                                            seekBackCustom()
+                                } else {
+                                    // When controls are hidden, pressing directional keys executes simple quick actions.
+                                    when (keyEvent.key) {
+                                        Key.DirectionUp -> {
+                                            performZapping(false)
                                             showControls = true
-                                        } else {
-                                            showControls = true
+                                            true
                                         }
-                                        true
-                                    }
-                                    Key.DirectionRight -> {
-                                        if (channel.type != "LIVE") {
-                                            seekForwardCustom()
+                                        Key.DirectionDown -> {
+                                            performZapping(true)
                                             showControls = true
-                                        } else {
-                                            showControls = true
+                                            true
                                         }
-                                        true
+                                        Key.DirectionLeft -> {
+                                            if (channel.type != "LIVE") {
+                                                seekBackCustom()
+                                                showControls = true
+                                            } else {
+                                                showControls = true
+                                            }
+                                            true
+                                        }
+                                        Key.DirectionRight -> {
+                                            if (channel.type != "LIVE") {
+                                                seekForwardCustom()
+                                                showControls = true
+                                            } else {
+                                                showControls = true
+                                            }
+                                            true
+                                        }
+                                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                            showControls = true
+                                            true
+                                        }
+                                        Key.Escape, Key.Back -> {
+                                            scope.launch { onBack() }
+                                            true
+                                        }
+                                        else -> false
                                     }
-                                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                                        showControls = true
-                                        true
-                                    }
-                                    Key.Escape, Key.Back -> {
-                                        scope.launch { onBack() }
-                                        true
-                                    }
-                                    else -> false
                                 }
                             }
                         }
@@ -454,7 +476,7 @@ fun PlayerScreen(
                     false
                 }
             }
-            .clickable { showControls = !showControls }
+            .clickable { if (!isTvMode) showControls = !showControls }
             .testTag("player_screen_root")
     ) {
         // NATIVE ANDROIDX MEDIA3 PLAYER
@@ -462,12 +484,18 @@ fun PlayerScreen(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     player = exoPlayer
-                    useController = false // Özel Compose Kontrolleri kullanacağız
+                    useController = isTvMode // TRUE for TV mode (enables Google's native TV controller and scrubbing)
                     setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FIT)
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
+                    playerViewRef = this
+                    if (isTvMode) {
+                        isFocusable = true
+                        isFocusableInTouchMode = true
+                        requestFocus()
+                    }
                 }
             },
             update = { playerView ->
@@ -478,6 +506,8 @@ fun PlayerScreen(
                     2 -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                     else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
                 }
+                playerViewRef = playerView
+                playerView.useController = isTvMode
             },
             modifier = Modifier.fillMaxSize()
         )
@@ -568,7 +598,7 @@ fun PlayerScreen(
 
         // COMPOSE PLAYER HUD (KONTROLLER)
         AnimatedVisibility(
-            visible = showControls,
+            visible = showControls && !isTvMode,
             enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
             exit = fadeOut() + slideOutVertically(targetOffsetY = { -it }),
             modifier = Modifier.fillMaxSize()
