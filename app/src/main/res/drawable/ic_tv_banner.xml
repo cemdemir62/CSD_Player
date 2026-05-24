@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Deep premium dark layout background -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#0A0A0A" />
+        </shape>
+    </item>
+
+    <!-- Warm dynamic dark-red background flow -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="315"
+                android:startColor="#2A0505"
+                android:endColor="#0A0A0A" />
+        </shape>
+    </item>
+
+    <!-- Left visual red accent indicator -->
+    <item android:right="314dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#E50914" />
+        </shape>
+    </item>
+
+    <!-- Core App Icon Rounded Box centered in banner -->
+    <item android:gravity="center" android:width="72dp" android:height="72dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="16dp" />
+            <solid android:color="#E50914" />
+        </shape>
+    </item>
+
+    <!-- Secondary Overlay for high-end feel -->
+    <item android:gravity="center" android:width="44dp" android:height="44dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="8dp" />
+            <solid android:color="#FFFFFF" />
+        </shape>
+    </item>
+</layer-list>

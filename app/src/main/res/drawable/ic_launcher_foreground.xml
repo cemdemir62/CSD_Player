@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Glowing Cyber Outer Shield (Hexagonal Bezel) -->
+    <path
+        android:pathData="M54,20 L84,37 L84,71 L54,88 L24,71 L24,37 Z"
+        android:strokeWidth="2.5"
+        android:strokeLineJoin="round"
+        android:fillColor="#CD050505">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="24"
+                android:startY="37"
+                android:endX="84"
+                android:endY="71"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#00E5FF" />
+                <item android:offset="0.5" android:color="#FFB300" />
+                <item android:offset="1.0" android:color="#E50914" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Chrome Inner Accent Bezel -->
+    <path
+        android:pathData="M54,24 L80,39 L80,69 L54,84 L28,69 L28,39 Z"
+        android:strokeWidth="1.5"
+        android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="28"
+                android:startY="39"
+                android:endX="80"
+                android:endY="69"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FFFFFF" />
+                <item android:offset="0.5" android:color="#555555" />
+                <item android:offset="1.0" android:color="#FFFFFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Masterful "CSD" Lettering Monogram (Glowing 3D Cyber-Chrome Outlines) -->
+    
+    <!-- 'C' Character Outline -->
+    <path
+        android:pathData="M43,45 C38,45 34,48 34,54 C34,60 38,63 43,63"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="34"
+                android:startY="45"
+                android:endX="43"
+                android:endY="63"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#00E5FF" />
+                <item android:offset="1.0" android:color="#FFFFFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 'S' Character Outline -->
+    <path
+        android:pathData="M50,46 C47,46 46,48 47,51 C48,54 59,52 60,56 C61,60 57,62 53,62"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="46"
+                android:startY="46"
+                android:endX="60"
+                android:endY="62"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FFFFFF" />
+                <item android:offset="0.7" android:color="#FFD54F" />
+                <item android:offset="1.0" android:color="#00E5FF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 'D' Character Outline -->
+    <path
+        android:pathData="M67,45 L71,45 C75,45 78,48 78,54 C78,60 75,63 71,63 L67,63 Z"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="67"
+                android:startY="45"
+                android:endX="78"
+                android:endY="63"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FFFFFF" />
+                <item android:offset="1.0" android:color="#E50914" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Minimalist play triangle underneath the logo -->
+    <path
+        android:pathData="M50,70 L60,70 L55,75 Z"
+        android:fillColor="#E50914" />
+
+</vector>
