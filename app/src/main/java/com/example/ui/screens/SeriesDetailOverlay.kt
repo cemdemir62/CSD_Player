@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import androidx.compose.ui.platform.LocalContext
+import coil.request.ImageRequest
 import com.example.data.model.IptvChannel
 import com.example.data.model.XtreamEpisode
 import androidx.compose.foundation.BorderStroke
@@ -199,13 +201,12 @@ fun SeriesDetailOverlay(
                                         modifier = Modifier.weight(1f),
                                         verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        itemsIndexed(seasons) { idx, season ->
+                                        itemsIndexed(seasons, key = { _, s -> s.seasonNumber }) { idx, season ->
                                             val isCurrent = season.seasonNumber == selectedSeasonNum
+                                            val selectSeasonClick = remember(season.seasonNumber) { { onSeasonSelected(season.seasonNumber) } }
                                             val itemModifier = Modifier
                                                 .fillMaxWidth()
-                                                .tvClickable(isTvMode = isTvMode) {
-                                                    onSeasonSelected(season.seasonNumber)
-                                                }
+                                                .tvClickable(isTvMode = isTvMode, onClick = selectSeasonClick)
                                             val finalModifier = if (idx == 0) {
                                                 itemModifier.focusRequester(firstItemFocusRequester)
                                             } else {
@@ -263,20 +264,23 @@ fun SeriesDetailOverlay(
                                             modifier = Modifier.fillMaxSize(),
                                             verticalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            items(activeEpisodes) { episode ->
+                                            items(activeEpisodes, key = { it.id }) { episode ->
                                                 val isLastWatched = episode.id == lastWatchedEpisodeId
-                                                EpisodeRowItem(
-                                                    episode = episode,
-                                                    seriesLogoUrl = series.logoUrl,
-                                                    isTvMode = isTvMode,
-                                                    isLastWatched = isLastWatched,
-                                                    onClick = {
+                                                val selectEpisodeClick = remember(episode.id, activeSeason?.seasonNumber) {
+                                                    {
                                                         val seasonObj = activeSeason ?: XtreamSeason(
                                                             "Sezon ${selectedSeasonNum}",
                                                             selectedSeasonNum
                                                         )
                                                         onEpisodeSelected(seasonObj, episode)
                                                     }
+                                                }
+                                                EpisodeRowItem(
+                                                    episode = episode,
+                                                    seriesLogoUrl = series.logoUrl,
+                                                    isTvMode = isTvMode,
+                                                    isLastWatched = isLastWatched,
+                                                    onClick = selectEpisodeClick
                                                 )
                                             }
                                         }
@@ -300,12 +304,11 @@ fun SeriesDetailOverlay(
                                         .padding(bottom = 12.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    itemsIndexed(seasons) { idx, season ->
+                                    itemsIndexed(seasons, key = { _, s -> s.seasonNumber }) { idx, season ->
                                         val isCurrent = season.seasonNumber == selectedSeasonNum
+                                        val selectSeasonClick = remember(season.seasonNumber) { { onSeasonSelected(season.seasonNumber) } }
                                         val itemModifier = Modifier
-                                            .tvClickable(isTvMode = isTvMode) {
-                                                onSeasonSelected(season.seasonNumber)
-                                            }
+                                            .tvClickable(isTvMode = isTvMode, onClick = selectSeasonClick)
                                         val finalModifier = if (idx == 0) {
                                             itemModifier.focusRequester(firstItemFocusRequester)
                                         } else {
@@ -354,20 +357,23 @@ fun SeriesDetailOverlay(
                                             modifier = Modifier.fillMaxSize(),
                                             verticalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            items(activeEpisodes) { episode ->
+                                            items(activeEpisodes, key = { it.id }) { episode ->
                                                 val isLastWatched = episode.id == lastWatchedEpisodeId
-                                                EpisodeRowItem(
-                                                    episode = episode,
-                                                    seriesLogoUrl = series.logoUrl,
-                                                    isTvMode = isTvMode,
-                                                    isLastWatched = isLastWatched,
-                                                    onClick = {
+                                                val selectEpisodeClick = remember(episode.id, activeSeason?.seasonNumber) {
+                                                    {
                                                         val seasonObj = activeSeason ?: XtreamSeason(
                                                             "Sezon ${selectedSeasonNum}",
                                                             selectedSeasonNum
                                                         )
                                                         onEpisodeSelected(seasonObj, episode)
                                                     }
+                                                }
+                                                EpisodeRowItem(
+                                                    episode = episode,
+                                                    seriesLogoUrl = series.logoUrl,
+                                                    isTvMode = isTvMode,
+                                                    isLastWatched = isLastWatched,
+                                                    onClick = selectEpisodeClick
                                                 )
                                             }
                                         }
@@ -414,8 +420,16 @@ fun EpisodeRowItem(
                 contentAlignment = Alignment.Center
             ) {
                 if (!displayLogo.isNullOrEmpty()) {
+                    val context = LocalContext.current
+                    val imageRequest = remember(displayLogo) {
+                        ImageRequest.Builder(context)
+                            .data(displayLogo)
+                            .crossfade(true)
+                            .size(110, 68)
+                            .build()
+                    }
                     AsyncImage(
-                        model = displayLogo,
+                        model = imageRequest,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()

@@ -34,6 +34,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import androidx.compose.ui.platform.LocalContext
+import coil.request.ImageRequest
 import com.example.data.model.IptvChannel
 import com.example.data.model.Playlist
 import com.example.ui.theme.NetflixDarkGrey
@@ -546,15 +548,14 @@ fun TvDashboard(
                     modifier = Modifier.weight(1f),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(types) { (typeKey, label) ->
+                    items(types, key = { it.first }) { (typeKey, label) ->
                         val isSelected = selectedType == typeKey
+                        val selectTabClick = remember(typeKey) { { onTypeSelected(typeKey) } }
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = if (isSelected) NetflixRed else Color(0xFF202020),
                             modifier = Modifier
-                                .tvClickable(isTvMode = true) {
-                                    onTypeSelected(typeKey)
-                                }
+                                .tvClickable(isTvMode = true, onClick = selectTabClick)
                                 .testTag("nav_tab_$typeKey")
                         ) {
                             Text(
@@ -610,13 +611,12 @@ fun TvDashboard(
                         ) {
                             item {
                                 val isSelected = selectedGroup == "Hepsi" || selectedGroup == null
+                                val selectAllClick = remember { { onGroupSelected("Hepsi") } }
                                 Surface(
                                     color = if (isSelected) NetflixRed.copy(alpha = 0.25f) else Color.Transparent,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .tvClickable(isTvMode = true) {
-                                            onGroupSelected("Hepsi")
-                                        }
+                                        .tvClickable(isTvMode = true, onClick = selectAllClick)
                                         .testTag("group_item_all")
                                 ) {
                                     Row(
@@ -642,15 +642,14 @@ fun TvDashboard(
                                 }
                             }
 
-                            items(groups) { groupName ->
+                            items(groups, key = { it }) { groupName ->
                                 val isSelected = selectedGroup == groupName
+                                val selectGroupClick = remember(groupName) { { onGroupSelected(groupName) } }
                                 Surface(
                                     color = if (isSelected) NetflixRed.copy(alpha = 0.25f) else Color.Transparent,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .tvClickable(isTvMode = true) {
-                                            onGroupSelected(groupName)
-                                        }
+                                        .tvClickable(isTvMode = true, onClick = selectGroupClick)
                                         .testTag("group_item_$groupName")
                                 ) {
                                     Row(
@@ -701,12 +700,14 @@ fun TvDashboard(
                             modifier = Modifier.fillMaxSize()
                         ) {
                             items(displayedChannels, key = { it.uniqueId }) { channel ->
+                                val clickAction = remember(channel.uniqueId) { { onChannelSelected(channel) } }
+                                val toggleFavAction = remember(channel.uniqueId) { { onToggleFavorite(channel) } }
                                 ChannelGridCard(
                                     channel = channel,
                                     isTvMode = true,
                                     isLandscape = isLandscapeCard,
-                                    onClick = { onChannelSelected(channel) },
-                                    onToggleFav = { onToggleFavorite(channel) }
+                                    onClick = clickAction,
+                                    onToggleFav = toggleFavAction
                                 )
                             }
 
@@ -976,8 +977,16 @@ fun ChannelGridCard(
             ) {
                 // Logo / Afiş Resmi
                 if (!channel.logoUrl.isNullOrEmpty()) {
+                    val context = LocalContext.current
+                    val imageRequest = remember(channel.logoUrl, isLandscape) {
+                        ImageRequest.Builder(context)
+                            .data(channel.logoUrl)
+                            .crossfade(true)
+                            .size(if (isLandscape) 280 else 200, if (isLandscape) 180 else 280) // Downsample to typical card size
+                            .build()
+                    }
                     AsyncImage(
-                        model = channel.logoUrl,
+                        model = imageRequest,
                         contentDescription = channel.name,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()

@@ -2,6 +2,7 @@ package com.example.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.room.Index
 import java.io.Serializable
 
 @Entity(tableName = "playlists")
@@ -15,7 +16,14 @@ data class Playlist(
     val createdAt: Long = System.currentTimeMillis()
 ) : Serializable
 
-@Entity(tableName = "iptv_channels")
+@Entity(
+    tableName = "iptv_channels",
+    indices = [
+        Index(value = ["playlistId", "type", "groupTitle"]),
+        Index(value = ["playlistId", "isFavorite"]),
+        Index(value = ["playlistId", "isRecent"])
+    ]
+)
 data class IptvChannel(
     @PrimaryKey val uniqueId: String, // format: "${playlistId}_${channelId}"
     val playlistId: Long,

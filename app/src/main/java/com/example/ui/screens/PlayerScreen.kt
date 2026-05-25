@@ -67,10 +67,20 @@ fun PlayerScreen(
     onToggleFavorite: (IptvChannel) -> Unit,
     onBack: () -> Unit,
     onNextChannel: () -> Unit,
-    onPrevChannel: () -> Unit
+    onPrevChannel: () -> Unit,
+    onNextEpisode: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Ekranın kapanmasını ve ekran koruyucunun devreye girmesini engelle (Keep screen on / awake)
+    val activity = context as? android.app.Activity
+    DisposableEffect(activity) {
+        activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose {
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
 
     // ExoPlayer Örneğini Yönetelim
     val exoPlayer = remember {
@@ -104,6 +114,10 @@ fun PlayerScreen(
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var sleepTimerMinutes by remember { mutableStateOf(0) } // 0: Kapalı
     var sleepTimerRemainingSec by remember { mutableStateOf(0L) }
+
+    // Otomatik sonraki bölüme geçme durumları
+    var showNextEpisodePrompt by remember { mutableStateOf(false) }
+    var nextEpisodeCountdown by remember { mutableStateOf(10) }
 
     // Akıllı Kategori İçi Zapping (Zap-lock within Category) Durumu ve Yardımcı Fonksiyonu
     val sharedPrefs = remember(context) { context.getSharedPreferences("zula_iptv_prefs", android.content.Context.MODE_PRIVATE) }
@@ -256,13 +270,15 @@ fun PlayerScreen(
     LaunchedEffect(isPlaying, channel) {
         if (channel.type != "LIVE") {
             try {
+                var tickCount = 0
                 while (true) {
                     val pos = exoPlayer.currentPosition
                     val dur = exoPlayer.duration.coerceAtLeast(0L)
                     position = pos
                     duration = dur
                     
-                    if (pos > 0L) {
+                    tickCount++
+                    if (pos > 0L && tickCount % 10 == 0) { // Sadece 10 saniyede bir diske yaz (SharedPrefs disk yükünü %90 azaltır)
                         sharedPrefs.edit().putLong("resume_pos_${channel.uniqueId}", pos).apply()
                     }
                     delay(1000)
@@ -298,6 +314,19 @@ fun PlayerScreen(
         }
     }
 
+    // Otomatik sonraki bölüme geçiş sayacı döngüsü
+    LaunchedEffect(showNextEpisodePrompt) {
+        if (showNextEpisodePrompt) {
+            nextEpisodeCountdown = 10
+            while (nextEpisodeCountdown > 0) {
+                delay(1000)
+                nextEpisodeCountdown--
+            }
+            showNextEpisodePrompt = false
+            onNextEpisode?.invoke()
+        }
+    }
+
     // ExoPlayer Event Listener'ı Kaydedelim
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
@@ -321,6 +350,9 @@ fun PlayerScreen(
                     }
                     Player.STATE_ENDED -> {
                         isLoading = false
+                        if (channel.type == "SERIES" && onNextEpisode != null) {
+                            showNextEpisodePrompt = true
+                        }
                     }
                     Player.STATE_IDLE -> {}
                 }
@@ -512,6 +544,7 @@ fun PlayerScreen(
                 PlayerView(ctx).apply {
                     player = exoPlayer
                     useController = isTvMode // TRUE for TV mode (enables Google's native TV controller and scrubbing)
+                    keepScreenOn = true // Ekran kapanmasını önle
                     setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FIT)
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
@@ -521,14 +554,40 @@ fun PlayerScreen(
                     if (isTvMode) {
                         isFocusable = true
                         isFocusableInTouchMode = true
+                        
+                        // Controller kapandığında odağı (focus) tekrar PlayerView'a geri al
+                        setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
+                            if (visibility == android.view.View.GONE || visibility == android.view.View.INVISIBLE) {
+                                isFocusable = true
+                                isFocusableInTouchMode = true
+                                requestFocus()
+                            }
+                        })
+
                         setOnKeyListener { _, keyCode, event ->
-                            if (event.action == android.view.KeyEvent.ACTION_DOWN) {
+                            val isDown = event.action == android.view.KeyEvent.ACTION_DOWN
+                            val isUp = event.action == android.view.KeyEvent.ACTION_UP
+                            if (isDown || isUp) {
                                 when (keyCode) {
+                                    android.view.KeyEvent.KEYCODE_MENU,
+                                    android.view.KeyEvent.KEYCODE_CAPTIONS,
+                                    android.view.KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK,
+                                    android.view.KeyEvent.KEYCODE_PROG_YELLOW,
+                                    android.view.KeyEvent.KEYCODE_PROG_GREEN,
+                                    android.view.KeyEvent.KEYCODE_I,
+                                    android.view.KeyEvent.KEYCODE_S -> {
+                                        if (isDown) {
+                                            showTrackSelection = true
+                                        }
+                                        true
+                                    }
                                     android.view.KeyEvent.KEYCODE_DPAD_CENTER,
                                     android.view.KeyEvent.KEYCODE_ENTER,
                                     android.view.KeyEvent.KEYCODE_NUMPAD_ENTER -> {
                                         if (!isControllerFullyVisible) {
-                                            showController()
+                                            if (isDown) {
+                                                showController()
+                                            }
                                             true
                                         } else {
                                             false
@@ -537,7 +596,9 @@ fun PlayerScreen(
                                     android.view.KeyEvent.KEYCODE_BACK,
                                     android.view.KeyEvent.KEYCODE_ESCAPE -> {
                                         if (isControllerFullyVisible) {
-                                            hideController()
+                                            if (isDown) {
+                                                hideController()
+                                            }
                                             true
                                         } else {
                                             false
@@ -545,7 +606,13 @@ fun PlayerScreen(
                                     }
                                     android.view.KeyEvent.KEYCODE_DPAD_UP -> {
                                         if (!isControllerFullyVisible) {
-                                            performZapping(false)
+                                            if (isDown) {
+                                                if (channel.type == "SERIES" || channel.type == "VOD" || channel.type == "MOVIE") {
+                                                    showTrackSelection = true
+                                                } else {
+                                                    performZapping(false)
+                                                }
+                                            }
                                             true
                                         } else {
                                             false
@@ -553,7 +620,13 @@ fun PlayerScreen(
                                     }
                                     android.view.KeyEvent.KEYCODE_DPAD_DOWN -> {
                                         if (!isControllerFullyVisible) {
-                                            performZapping(true)
+                                            if (isDown) {
+                                                if (channel.type == "SERIES" || channel.type == "VOD" || channel.type == "MOVIE") {
+                                                    showTrackSelection = true
+                                                } else {
+                                                    performZapping(true)
+                                                }
+                                            }
                                             true
                                         } else {
                                             false
@@ -1405,6 +1478,20 @@ fun PlayerScreen(
             }
         )
 
+        // Otomatik Sonraki Bölüm Geçiş Diyaloğu
+        NextEpisodePromptDialog(
+            show = showNextEpisodePrompt,
+            countdown = nextEpisodeCountdown,
+            isTvMode = isTvMode,
+            onPlayNow = {
+                showNextEpisodePrompt = false
+                onNextEpisode?.invoke()
+            },
+            onCancel = {
+                showNextEpisodePrompt = false
+            }
+        )
+
         // SOL KANAL LİSTESİ ÇEKMECESİ (Sidebar Drawer Overlay)
         androidx.compose.animation.AnimatedVisibility(
             visible = showChannelsSidebar,
@@ -1496,15 +1583,18 @@ fun PlayerScreen(
                     ) {
                         items(filteredChannels, key = { it.uniqueId }) { chan ->
                             val isCurrentPlaying = chan.uniqueId == channel.uniqueId
+                            val selectChannelClick = remember(chan.uniqueId) {
+                                {
+                                    onChannelSelected(chan)
+                                    showChannelsSidebar = false // Close after choosing
+                                }
+                            }
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
                                 color = if (isCurrentPlaying) NetflixRed.copy(alpha = 0.9f) else Color(0xFF1E1E1E),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .tvClickable(isTvMode = isTvMode) {
-                                        onChannelSelected(chan)
-                                        showChannelsSidebar = false // Close after choosing
-                                    }
+                                    .tvClickable(isTvMode = isTvMode, onClick = selectChannelClick)
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
@@ -2302,3 +2392,118 @@ fun SleepTimerDialog(
         }
     }
 }
+
+@Composable
+fun NextEpisodePromptDialog(
+    show: Boolean,
+    countdown: Int,
+    isTvMode: Boolean,
+    onPlayNow: () -> Unit,
+    onCancel: () -> Unit
+) {
+    if (!show) return
+    val playNowFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(show) {
+        if (show) {
+            delay(200)
+            try {
+                playNowFocusRequester.requestFocus()
+            } catch (e: Exception) {}
+        }
+    }
+
+    Dialog(onDismissRequest = onCancel) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF141414)),
+            border = BorderStroke(2.dp, NetflixRed.copy(alpha = 0.8f)),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .fillMaxWidth(if (isTvMode) 0.5f else 0.85f)
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Sıradaki Bölüm Başlıyor",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(80.dp)
+                ) {
+                    CircularProgressIndicator(
+                        progress = countdown.toFloat() / 10f,
+                        color = NetflixRed,
+                        strokeWidth = 6.dp,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    Text(
+                        text = "$countdown",
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Dizinizin bir sonraki bölümü otomatik olarak başlatılacaktır.",
+                    color = Color.LightGray,
+                    fontSize = 12.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    lineHeight = 16.sp
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    val playNowInteractionSource = remember { MutableInteractionSource() }
+                    val cancelInteractionSource = remember { MutableInteractionSource() }
+
+                    Button(
+                        onClick = onPlayNow,
+                        interactionSource = playNowInteractionSource,
+                        colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(playNowFocusRequester)
+                            .focusable(interactionSource = playNowInteractionSource)
+                            .tvFocusBorder(isTvMode = isTvMode, interactionSource = playNowInteractionSource)
+                    ) {
+                        Text("Şimdi Oynat", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = onCancel,
+                        interactionSource = cancelInteractionSource,
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusable(interactionSource = cancelInteractionSource)
+                            .tvFocusBorder(isTvMode = isTvMode, interactionSource = cancelInteractionSource)
+                    ) {
+                        Text("İptal", color = Color.White)
+                    }
+                }
+            }
+        }
+    }
+}
+

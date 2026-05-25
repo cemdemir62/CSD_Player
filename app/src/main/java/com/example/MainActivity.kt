@@ -58,6 +58,9 @@ class MainActivity : ComponentActivity() {
                 val activeChannel by viewModel.activeChannel.collectAsState()
                 val groups by viewModel.groupsByType.collectAsState()
                 val channels by viewModel.channels.collectAsState()
+                val activeSeriesChannel by viewModel.activeSeriesChannel.collectAsState()
+                val seriesSeasons by viewModel.seriesSeasons.collectAsState()
+                val seriesEpisodes by viewModel.seriesEpisodes.collectAsState()
 
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     // Android sistem çubuğu (Edge-to-Edge) insets padding değerlerini alarak,
@@ -86,6 +89,69 @@ class MainActivity : ComponentActivity() {
                             BackHandler {
                                 viewModel.selectChannel(null)
                             }
+                            val context = LocalContext.current
+                            val sharedPrefs = remember(context) { context.getSharedPreferences("zula_iptv_prefs", android.content.Context.MODE_PRIVATE) }
+                            
+                            var onNextEp: (() -> Unit)? = null
+                            if (channel.type == "SERIES" && activeSeriesChannel != null) {
+                                var currentSeasonNum: Int? = null
+                                var currentEpIndex: Int? = null
+                                
+                                for ((sNum, epList) in seriesEpisodes) {
+                                    val index = epList.indexOfFirst { it.id == channel.channelId }
+                                    if (index != -1) {
+                                        currentSeasonNum = sNum
+                                        currentEpIndex = index
+                                        break
+                                    }
+                                }
+                                
+                                if (currentSeasonNum != null && currentEpIndex != null) {
+                                    val currentSeasonEpisodes = seriesEpisodes[currentSeasonNum] ?: emptyList()
+                                    var nextEpisode: Pair<com.example.data.model.XtreamSeason, com.example.data.model.XtreamEpisode>? = null
+                                    
+                                    if (currentEpIndex + 1 < currentSeasonEpisodes.size) {
+                                        val nextEp = currentSeasonEpisodes[currentEpIndex + 1]
+                                        val seasonObj = seriesSeasons.find { it.seasonNumber == currentSeasonNum }
+                                        if (seasonObj != null) {
+                                            nextEpisode = seasonObj to nextEp
+                                        }
+                                    } else {
+                                        val sortedSeasons = seriesSeasons.sortedBy { it.seasonNumber }
+                                        val currentSeasonIdx = sortedSeasons.indexOfFirst { it.seasonNumber == currentSeasonNum }
+                                        if (currentSeasonIdx != -1 && currentSeasonIdx + 1 < sortedSeasons.size) {
+                                            val nextSeason = sortedSeasons[currentSeasonIdx + 1]
+                                            val nextSeasonEpisodes = seriesEpisodes[nextSeason.seasonNumber] ?: emptyList()
+                                            if (nextSeasonEpisodes.isNotEmpty()) {
+                                                nextEpisode = nextSeason to nextSeasonEpisodes.first()
+                                            }
+                                        }
+                                    }
+                                    
+                                    if (nextEpisode != null) {
+                                        onNextEp = {
+                                            val (nextSeasonObj, nextEp) = nextEpisode!!
+                                            sharedPrefs.edit()
+                                                .putInt("series_${activeSeriesChannel!!.uniqueId}_last_season", nextSeasonObj.seasonNumber)
+                                                .putString("series_${activeSeriesChannel!!.uniqueId}_last_episode_id", nextEp.id)
+                                                .apply()
+                                            
+                                            val nextTempChannel = IptvChannel(
+                                                uniqueId = "${selectedPlaylist!!.id}_episode_${nextEp.id}",
+                                                playlistId = selectedPlaylist!!.id,
+                                                channelId = nextEp.id,
+                                                name = "${activeSeriesChannel!!.name} - ${nextSeasonObj.name} Bölüm ${nextEp.episodeNum} : ${nextEp.name}",
+                                                streamUrl = nextEp.streamUrl,
+                                                logoUrl = activeSeriesChannel!!.logoUrl ?: nextEp.logoUrl,
+                                                groupTitle = activeSeriesChannel!!.groupTitle,
+                                                type = "SERIES"
+                                            )
+                                            viewModel.selectChannel(nextTempChannel)
+                                        }
+                                    }
+                                }
+                            }
+
                             PlayerScreen(
                                 channel = channel,
                                 isTvMode = isTv,
@@ -94,7 +160,8 @@ class MainActivity : ComponentActivity() {
                                 onToggleFavorite = { chan -> viewModel.toggleFavorite(chan) },
                                 onBack = { viewModel.selectChannel(null) },
                                 onNextChannel = { viewModel.zapNext() },
-                                onPrevChannel = { viewModel.zapPrev() }
+                                onPrevChannel = { viewModel.zapPrev() },
+                                onNextEpisode = onNextEp
                             )
                         }
 
@@ -178,16 +245,14 @@ class MainActivity : ComponentActivity() {
                                         mutableStateOf(sharedPrefs.getString("series_${series.uniqueId}_last_episode_id", null))
                                     }
 
-                                    val seasons by viewModel.seriesSeasons.collectAsState()
-                                    val episodes by viewModel.seriesEpisodes.collectAsState()
                                     val selectedSeasonNum by viewModel.selectedSeasonNum.collectAsState()
                                     val isFetchingSeries by viewModel.isFetchingSeriesInfo.collectAsState()
                                     val seriesFetchError by viewModel.seriesFetchError.collectAsState()
 
                                     SeriesDetailOverlay(
                                         series = series,
-                                        seasons = seasons,
-                                        episodesBySeason = episodes,
+                                        seasons = seriesSeasons,
+                                        episodesBySeason = seriesEpisodes,
                                         selectedSeasonNum = selectedSeasonNum,
                                         isLoading = isFetchingSeries,
                                         error = seriesFetchError,
