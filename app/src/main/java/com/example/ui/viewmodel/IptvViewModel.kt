@@ -291,7 +291,7 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 val id = repository.addPlaylist(playlist)
                 _refreshState.value = RefreshState.Loading("Kanallar senkronize ediliyor...")
-                repository.refreshPlaylist(id)
+                repository.refreshPlaylist(getApplication(), id)
                 _refreshState.value = RefreshState.Success
             } catch (e: Exception) {
                 _refreshState.value = RefreshState.Error(e.message ?: "Kaynak bilgileri doğrulanırken hata oluştu.")
@@ -304,7 +304,7 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _refreshState.value = RefreshState.Loading("Veriler güncelleniyor...")
             try {
-                repository.refreshPlaylist(playlist.id)
+                repository.refreshPlaylist(getApplication(), playlist.id)
                 _refreshState.value = RefreshState.Success
             } catch (e: Exception) {
                 _refreshState.value = RefreshState.Error(e.message ?: "Güncelleme sırasında hata oluştu.")

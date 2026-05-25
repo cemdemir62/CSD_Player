@@ -16,6 +16,7 @@ object XtreamService {
         .build()
 
     suspend fun loginAndFetchChannels(
+        context: android.content.Context,
         playlistId: Long,
         baseUrl: String,
         username: String,
@@ -35,6 +36,20 @@ object XtreamService {
             val status = userInfo?.optString("status") ?: "Active"
             if (!status.equals("Active", ignoreCase = true)) {
                 throw Exception("Kullanıcı hesabı aktif değil: $status")
+            }
+            if (userInfo != null) {
+                val expDateStr = userInfo.optString("exp_date", "")
+                val prefs = context.getSharedPreferences("zula_iptv_prefs", android.content.Context.MODE_PRIVATE)
+                if (expDateStr.isNotEmpty() && expDateStr != "null") {
+                    val expTime = expDateStr.toLongOrNull()
+                    if (expTime != null && expTime > 0) {
+                        prefs.edit().putLong("playlist_expiry_${playlistId}", expTime * 1000).apply()
+                    } else {
+                        prefs.edit().putLong("playlist_expiry_${playlistId}", -1L).apply()
+                    }
+                } else {
+                    prefs.edit().putLong("playlist_expiry_${playlistId}", -1L).apply()
+                }
             }
         } catch (e: Exception) {
             if (e.message?.contains("Kullanıcı hesabı") == true) {

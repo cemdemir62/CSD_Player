@@ -93,24 +93,37 @@ fun SettingsDialog(
         sdf.format(date)
     }
 
-    // Subscription expirations usually simulated to 1 year for IPTV links from creation
-    val expirationTimeFormatted = remember(playlist.createdAt) {
-        val calendar = Calendar.getInstance()
-        calendar.timeInMillis = playlist.createdAt
-        calendar.add(Calendar.YEAR, 1)
-        val date = calendar.time
-        val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr"))
-        sdf.format(date)
+    // Subscription expirations: checked from stored Xtream login info, default to 1 year for M3U links
+    val expiryMs = remember(playlist.id, playlist.createdAt) {
+        val stored = sharedPrefs.getLong("playlist_expiry_${playlist.id}", 0L)
+        if (stored != 0L) {
+            stored
+        } else {
+            val calendar = Calendar.getInstance()
+            calendar.timeInMillis = playlist.createdAt
+            calendar.add(Calendar.YEAR, 1)
+            calendar.timeInMillis
+        }
     }
 
-    val daysRemaining = remember(playlist.createdAt) {
-        val calendar = Calendar.getInstance()
-        calendar.timeInMillis = playlist.createdAt
-        calendar.add(Calendar.YEAR, 1)
-        val expMs = calendar.timeInMillis
-        val diffMs = expMs - System.currentTimeMillis()
-        val days = (diffMs / (1000 * 60 * 60 * 24)).coerceAtLeast(0)
-        days
+    val expirationTimeFormatted = remember(expiryMs) {
+        if (expiryMs == -1L) {
+            "Sınırsız / Ömür Boyu"
+        } else {
+            val date = Date(expiryMs)
+            val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr"))
+            sdf.format(date)
+        }
+    }
+
+    val daysRemaining = remember(expiryMs) {
+        if (expiryMs == -1L) {
+            "Sınırsız"
+        } else {
+            val diffMs = expiryMs - System.currentTimeMillis()
+            val days = (diffMs / (1000 * 60 * 60 * 24)).coerceAtLeast(0)
+            "$days Gün Kaldı"
+        }
     }
 
     // Dynamic Playlist metrics
@@ -402,7 +415,7 @@ fun SettingsPanelContent(
     serverHost: String,
     creationFormatted: String,
     expirationFormatted: String,
-    daysRemaining: Long,
+    daysRemaining: String,
     liveCount: Int,
     movieCount: Int,
     seriesCount: Int,
@@ -427,10 +440,14 @@ fun SettingsPanelContent(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Subscription active gradient card header
+                val liveCardInteraction = remember { MutableInteractionSource() }
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     border = BorderStroke(1.dp, Color(0xFF2E7D32).copy(alpha = 0.6f)),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusable(interactionSource = liveCardInteraction)
+                        .tvFocusBorder(isTvMode = isTvMode, interactionSource = liveCardInteraction, shape = RoundedCornerShape(16.dp))
                 ) {
                     Row(
                         modifier = Modifier
@@ -453,7 +470,7 @@ fun SettingsPanelContent(
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         Text(
-                            text = "$daysRemaining Gün Kaldı",
+                            text = daysRemaining,
                             color = Color.White,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
@@ -471,30 +488,37 @@ fun SettingsPanelContent(
                         title = "Canlı TV",
                         count = "$liveCount",
                         icon = Icons.Default.Tv,
-                        tint = Color(0xFF2196F3)
+                        tint = Color(0xFF2196F3),
+                        isTvMode = isTvMode
                     )
                     MetricBox(
                         modifier = Modifier.weight(1f),
                         title = "Filmler",
                         count = "$movieCount",
                         icon = Icons.Default.Movie,
-                        tint = Color(0xFFE91E63)
+                        tint = Color(0xFFE91E63),
+                        isTvMode = isTvMode
                     )
                     MetricBox(
                         modifier = Modifier.weight(1f),
                         title = "Diziler",
                         count = "$seriesCount",
                         icon = Icons.Default.VideoLibrary,
-                        tint = Color(0xFFFF9800)
+                        tint = Color(0xFFFF9800),
+                        isTvMode = isTvMode
                     )
                 }
 
                 // Info entries structured within an advanced Glass Card
+                val detailsCardInteraction = remember { MutableInteractionSource() }
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF13131A)),
                     border = BorderStroke(1.dp, Color(0xFF1E1E26)),
                     shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusable(interactionSource = detailsCardInteraction)
+                        .tvFocusBorder(isTvMode = isTvMode, interactionSource = detailsCardInteraction, shape = RoundedCornerShape(16.dp))
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp)
@@ -816,11 +840,15 @@ fun SettingsPanelContent(
                 val buildVersion = android.os.Build.VERSION.RELEASE
                 val buildSdk = android.os.Build.VERSION.SDK_INT
 
+                val specsCardInteraction = remember { MutableInteractionSource() }
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF13131A)),
                     border = BorderStroke(1.dp, Color(0xFF1E1E26)),
                     shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusable(interactionSource = specsCardInteraction)
+                        .tvFocusBorder(isTvMode = isTvMode, interactionSource = specsCardInteraction, shape = RoundedCornerShape(16.dp))
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp)
@@ -882,13 +910,17 @@ fun MetricBox(
     title: String,
     count: String,
     icon: ImageVector,
-    tint: Color
+    tint: Color,
+    isTvMode: Boolean = false
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = Color(0xFF13131A),
         border = BorderStroke(1.dp, tint.copy(alpha = 0.25f)),
         modifier = modifier
+            .focusable(interactionSource = interactionSource)
+            .tvFocusBorder(isTvMode = isTvMode, interactionSource = interactionSource, shape = RoundedCornerShape(14.dp))
     ) {
         Row(
             modifier = Modifier.padding(12.dp),

@@ -35,7 +35,7 @@ class IptvRepository(private val iptvDao: IptvDao) {
         iptvDao.deletePlaylist(playlist)
     }
 
-    suspend fun refreshPlaylist(playlistId: Long): Unit = withContext(Dispatchers.IO) {
+    suspend fun refreshPlaylist(context: android.content.Context, playlistId: Long): Unit = withContext(Dispatchers.IO) {
         val playlist = iptvDao.getPlaylistById(playlistId) ?: return@withContext
         iptvDao.deleteChannelsByPlaylist(playlistId)
 
@@ -44,6 +44,7 @@ class IptvRepository(private val iptvDao: IptvDao) {
             M3uParser.parse(content, playlistId)
         } else {
             XtreamService.loginAndFetchChannels(
+                context = context,
                 playlistId = playlistId,
                 baseUrl = playlist.url,
                 username = playlist.username ?: "",

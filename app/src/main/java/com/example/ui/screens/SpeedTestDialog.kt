@@ -151,12 +151,14 @@ fun SpeedTestDialog(
             shape = RoundedCornerShape(20.dp),
             modifier = Modifier
                 .fillMaxWidth(if (isTvMode) 0.65f else 0.95f)
+                .fillMaxHeight(if (isTvMode) 0.88f else 0.92f)
                 .padding(12.dp)
                 .testTag("speed_test_dialog")
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -274,7 +276,8 @@ fun SpeedTestDialog(
                         label = "PING & JITTER",
                         value = if (pingVal != null) "$pingVal ms" else "--",
                         icon = Icons.Default.SwapVert,
-                        active = activePhase == "PING"
+                        active = activePhase == "PING",
+                        isTvMode = isTvMode
                     )
                     // Download Column
                     NetworkMetricCard(
@@ -286,7 +289,8 @@ fun SpeedTestDialog(
                             else -> "--"
                         },
                         icon = Icons.Default.ArrowDownward,
-                        active = activePhase == "DOWNLOAD"
+                        active = activePhase == "DOWNLOAD",
+                        isTvMode = isTvMode
                     )
                     // Upload Column
                     NetworkMetricCard(
@@ -298,7 +302,8 @@ fun SpeedTestDialog(
                             else -> "--"
                         },
                         icon = Icons.Default.ArrowUpward,
-                        active = activePhase == "UPLOAD"
+                        active = activePhase == "UPLOAD",
+                        isTvMode = isTvMode
                     )
                 }
 
@@ -487,8 +492,10 @@ fun NetworkMetricCard(
     label: String,
     value: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    active: Boolean
+    active: Boolean,
+    isTvMode: Boolean = false
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = if (active) Color(0xFF1E0E10) else Color(0xFF141414),
@@ -497,6 +504,8 @@ fun NetworkMetricCard(
             if (active) NetflixRed.copy(alpha = 0.8f) else Color(0xFF2E2E2E)
         ),
         modifier = modifier
+            .focusable(interactionSource = interactionSource)
+            .tvFocusBorder(isTvMode = isTvMode, interactionSource = interactionSource, shape = RoundedCornerShape(12.dp))
     ) {
         Column(
             modifier = Modifier.padding(10.dp),
