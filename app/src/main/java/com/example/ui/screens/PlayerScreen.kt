@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalContext
@@ -38,7 +39,11 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Brush
 
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -48,6 +53,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.C
 import androidx.media3.common.TrackSelectionOverride
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 
 data class PlayerTrack(
     val group: androidx.media3.common.TrackGroup,
@@ -106,6 +112,9 @@ fun PlayerScreen(
 
     // Sol Kanal Listesi Çekmecesi Görünürlüğü
     var showChannelsSidebar by remember { mutableStateOf(false) }
+
+    // Hızlı Kanal Geçiş (Quick Zap) Çekmecesi Görünürlüğü
+    var showQuickZapPanel by remember { mutableStateOf(false) }
 
     // Öneri 3: EPG / Yayın Akışı Bilgi Paneli Görünürlüğü
     var showEpgPanel by remember { mutableStateOf(false) }
@@ -1111,6 +1120,24 @@ fun PlayerScreen(
                                         }
                                     }
 
+                                    // Öneri 1: Hızlı Kanal Geçiş (Quick Zap) Butonu
+                                    val quickZapInteractionSource = remember { MutableInteractionSource() }
+                                    Button(
+                                        onClick = { showQuickZapPanel = true },
+                                        interactionSource = quickZapInteractionSource,
+                                        colors = ButtonDefaults.buttonColors(containerColor = NetflixLightGrey),
+                                        shape = MaterialTheme.shapes.small,
+                                        modifier = Modifier
+                                            .tvFocusBorder(isTvMode = isTvMode, interactionSource = quickZapInteractionSource, shape = MaterialTheme.shapes.small)
+                                            .testTag("player_quick_zap_button")
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.Bolt, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Hızlı Geçiş", color = Color.White, fontSize = 11.sp)
+                                        }
+                                    }
+
                                     // Öneri 3: Yayın Akışı (EPG)
                                     val epgInteractionSource = remember { MutableInteractionSource() }
                                     Button(
@@ -1318,6 +1345,23 @@ fun PlayerScreen(
                                         Icon(Icons.Default.Menu, null, tint = Color.White, modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text("Kanal Listesi", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+
+                                // Hızlı Geçiş (Quick Zap) Butonu
+                                Button(
+                                    onClick = { showQuickZapPanel = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = NetflixLightGrey),
+                                    shape = RoundedCornerShape(20.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                                    modifier = Modifier
+                                        .height(38.dp)
+                                        .testTag("player_quick_zap_button")
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Bolt, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Hızlı Geçiş", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
 
@@ -1914,6 +1958,155 @@ fun PlayerScreen(
                                         text = "Yayın Tamamlanma Oranı: %$percent",
                                         color = Color.LightGray,
                                         fontSize = 9.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // HIZLI KANAL GEÇİŞ (QUICK ZAP) PANELİ (Bottom Carousel Overlay - Öneri 1)
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showQuickZapPanel,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(), // Aşağıdan yukarı kayarak girer
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(if (isTvMode) 230.dp else 190.dp)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.82f),
+                            Color.Black.copy(alpha = 0.98f)
+                        )
+                    )
+                )
+        ) {
+            val quickZapCloseFocusRequester = remember { FocusRequester() }
+            val currentGroup = channel.groupTitle
+            // Sadece mevcut kategorideki kanalları listele (veya boşsa ilk 40'ı göster)
+            val filteredGroup = remember(channels, currentGroup) {
+                val groupList = if (currentGroup != null) channels.filter { it.groupTitle == currentGroup } else channels
+                if (groupList.size > 50) groupList.take(50) else groupList
+            }
+
+            LaunchedEffect(showQuickZapPanel) {
+                if (showQuickZapPanel && isTvMode) {
+                    delay(300)
+                    try {
+                        quickZapCloseFocusRequester.requestFocus()
+                    } catch (e: Exception) {}
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "HIZLI KANAL GEÇİŞİ (QUICK ZAP)",
+                            color = NetflixRed,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "${currentGroup ?: "Tüm Kanallar"} • ${filteredGroup.size} Yayın",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    IconButton(
+                        onClick = { showQuickZapPanel = false },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .focusRequester(quickZapCloseFocusRequester)
+                            .tvClickable(isTvMode = isTvMode) { showQuickZapPanel = false }
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Zap Kapat", tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                }
+
+                // Kanalların horizontal listesi
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    contentPadding = PaddingValues(vertical = 4.dp, horizontal = 2.dp)
+                ) {
+                    items(filteredGroup, key = { "zap_" + it.uniqueId }) { chan ->
+                        val isPlayingChan = chan.uniqueId == channel.uniqueId
+                        val interactionSource = remember { MutableInteractionSource() }
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isPlayingChan) NetflixRed else Color(0xFF16161C),
+                            border = BorderStroke(
+                                width = if (isPlayingChan) 2.dp else 1.dp,
+                                color = if (isPlayingChan) NetflixRed else Color.White.copy(alpha = 0.08f)
+                            ),
+                            modifier = Modifier
+                                .width(if (isTvMode) 150.dp else 120.dp)
+                                .fillMaxHeight()
+                                .tvFocusBorder(isTvMode = isTvMode, interactionSource = interactionSource, shape = RoundedCornerShape(10.dp))
+                                .clickable(
+                                    interactionSource = interactionSource,
+                                    indication = androidx.compose.foundation.LocalIndication.current
+                                ) {
+                                    onChannelSelected(chan)
+                                }
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+                                if (!chan.logoUrl.isNullOrEmpty()) {
+                                    AsyncImage(
+                                        model = chan.logoUrl,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .align(Alignment.TopEnd)
+                                            .alpha(0.3f)
+                                    )
+                                }
+
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    verticalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(3.dp),
+                                        color = if (isPlayingChan) Color.White.copy(alpha = 0.25f) else NetflixRed.copy(alpha = 0.15f),
+                                        modifier = Modifier.padding(bottom = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isPlayingChan) "Şu An Aktif" else "Kanal",
+                                            color = if (isPlayingChan) Color.White else NetflixRed,
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+
+                                    Text(
+                                        text = chan.name,
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -2521,13 +2714,16 @@ fun NextEpisodePromptDialog(
         }
     }
 
-    Dialog(onDismissRequest = onCancel) {
+    Dialog(
+        onDismissRequest = onCancel,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF141414)),
             border = BorderStroke(2.dp, NetflixRed.copy(alpha = 0.8f)),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
-                .fillMaxWidth(if (isTvMode) 0.5f else 0.85f)
+                .width(if (isTvMode) 440.dp else 320.dp)
                 .padding(16.dp)
         ) {
             Column(

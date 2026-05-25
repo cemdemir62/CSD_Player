@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -87,14 +88,14 @@ fun SeriesDetailOverlay(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.96f))
-                .padding(16.dp),
+                .background(Color.Black.copy(alpha = 0.98f)),
             contentAlignment = Alignment.Center
         ) {
             if (isLoading) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(24.dp)
                 ) {
                     CircularProgressIndicator(color = NetflixRed)
                     Spacer(modifier = Modifier.height(16.dp))
@@ -126,258 +127,213 @@ fun SeriesDetailOverlay(
                     }
                 }
             } else {
-                // Main Success layout - beautifully adaptive!
+                // Main Success layout - beautifully Netflix-inspired!
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // Header: Series Title and Close button
-                    Row(
+                    // Cinematic widescreen Hero Banner Block at the very top
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .height(if (isTvMode) 320.dp else 220.dp)
+                            .background(Color.Black)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = series.name,
-                                color = Color.White,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Black,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = series.groupTitle ?: "Diziler",
-                                color = NetflixRed,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                        if (!series.logoUrl.isNullOrEmpty()) {
+                            val context = LocalContext.current
+                            val bgImageRequest = remember(series.logoUrl) {
+                                ImageRequest.Builder(context)
+                                    .data(series.logoUrl)
+                                    .crossfade(true)
+                                    .build()
+                            }
+                            AsyncImage(
+                                model = bgImageRequest,
+                                contentDescription = series.name,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
                             )
                         }
+
+                        // Cinematic layered gradient overlays (depth & readability)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Black.copy(alpha = 0.6f),
+                                            Color.Transparent,
+                                            Color.Black.copy(alpha = 0.2f),
+                                            Color.Black
+                                        )
+                                    )
+                                )
+                        )
+
+                        // Close button overlay top right (accessible and well spaced)
                         IconButton(
                             onClick = onClose,
-                            modifier = Modifier.tvClickable(isTvMode = isTvMode) { onClose() }
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(16.dp)
+                                .background(Color.Black.copy(alpha = 0.65f), androidx.compose.foundation.shape.CircleShape)
+                                .tvClickable(isTvMode = isTvMode) { onClose() }
                         ) {
                             Icon(Icons.Default.Close, contentDescription = "Kapat", tint = Color.White)
                         }
+
+                        // Bottom meta overlay container
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(horizontal = 24.dp, vertical = 20.dp)
+                        ) {
+                            // Category Badge
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = NetflixRed,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            ) {
+                                Text(
+                                    text = (series.groupTitle ?: "Diziler").uppercase(),
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+
+                            // Bold Display Title
+                            Text(
+                                text = series.name,
+                                color = Color.White,
+                                fontSize = if (isTvMode) 30.sp else 22.sp,
+                                fontWeight = FontWeight.Black,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            
+                            Spacer(modifier = Modifier.height(6.dp))
+                            
+                            // Seasons / EP Count
+                            Text(
+                                text = "${seasons.size} Sezon • Google AI Studio IPTV",
+                                color = Color.Gray,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
 
-                    // Seasons and Episodes main section
-                    BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                        val useLandscape = maxWidth > 600.dp
-
-                        if (useLandscape) {
-                            // Landscape/Wide View: Side-by-side layout
-                            Row(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalArrangement = Arrangement.spacedBy(20.dp)
-                            ) {
-                                // Left Column: Poster / Seasons lists
-                                Column(
-                                    modifier = Modifier
-                                        .weight(0.35f)
-                                        .fillMaxHeight()
-                                ) {
-                                    if (!series.logoUrl.isNullOrEmpty()) {
-                                        AsyncImage(
-                                            model = series.logoUrl,
-                                            contentDescription = series.name,
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(200.dp)
-                                                .clip(RoundedCornerShape(8.dp))
-                                        )
-                                        Spacer(modifier = Modifier.height(16.dp))
-                                    }
-
-                                    Text(
-                                        text = "Sezonlar",
-                                        color = Color.Gray,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(bottom = 8.dp)
-                                    )
-
-                                    LazyColumn(
-                                        modifier = Modifier.weight(1f),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        itemsIndexed(seasons, key = { _, s -> s.seasonNumber }) { idx, season ->
-                                            val isCurrent = season.seasonNumber == selectedSeasonNum
-                                            val selectSeasonClick = remember(season.seasonNumber) { { onSeasonSelected(season.seasonNumber) } }
-                                            val itemModifier = Modifier
-                                                .fillMaxWidth()
-                                                .tvClickable(isTvMode = isTvMode, onClick = selectSeasonClick)
-                                            val finalModifier = if (idx == 0) {
-                                                itemModifier.focusRequester(firstItemFocusRequester)
-                                            } else {
-                                                itemModifier
-                                            }
-
-                                            Surface(
-                                                shape = RoundedCornerShape(8.dp),
-                                                color = if (isCurrent) NetflixRed else NetflixDarkGrey,
-                                                modifier = finalModifier
-                                            ) {
-                                                Text(
-                                                    text = season.name,
-                                                    color = Color.White,
-                                                    fontSize = 14.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                                                )
-                                            }
-                                        }
-                                    }
+                    // Lower Content Area (Seasons & Episodes Row/List with clean padding)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(horizontal = 24.dp, vertical = 12.dp)
+                    ) {
+                        Text(
+                            text = "SEZONLAR",
+                            color = Color.Gray,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 10.dp)
+                        )
+                        
+                        // Horizontal scrollable Season Tabs
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp)
+                        ) {
+                            itemsIndexed(seasons, key = { _, s -> s.seasonNumber }) { idx, season ->
+                                val isCurrent = season.seasonNumber == selectedSeasonNum
+                                val selectSeasonClick = remember(season.seasonNumber) { { onSeasonSelected(season.seasonNumber) } }
+                                val itemModifier = Modifier
+                                    .tvClickable(isTvMode = isTvMode, onClick = selectSeasonClick)
+                                
+                                val finalModifier = if (idx == 0) {
+                                    itemModifier.focusRequester(firstItemFocusRequester)
+                                } else {
+                                    itemModifier
                                 }
 
-                                // Right Column: Scrollable List of Episodes
-                                Column(
-                                    modifier = Modifier
-                                        .weight(0.65f)
-                                        .fillMaxHeight()
-                                        .background(NetflixDarkGrey, RoundedCornerShape(8.dp))
-                                        .padding(16.dp)
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp), // modern pill
+                                    color = if (isCurrent) NetflixRed else Color(0xFF1E1E22),
+                                    border = BorderStroke(
+                                        width = 1.5.dp,
+                                        color = if (isCurrent) NetflixRed else Color.White.copy(alpha = 0.08f)
+                                    ),
+                                    modifier = finalModifier
                                 ) {
-                                    val activeSeason = seasons.find { it.seasonNumber == selectedSeasonNum }
                                     Text(
-                                        text = "${activeSeason?.name ?: "Bölümler"}",
-                                        color = Color.White,
-                                        fontSize = 18.sp,
+                                        text = season.name,
+                                        color = if (isCurrent) Color.White else Color.LightGray,
+                                        fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(bottom = 12.dp)
+                                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
                                     )
-
-                                    val activeEpisodes = episodesBySeason[selectedSeasonNum] ?: emptyList()
-                                    if (activeEpisodes.isEmpty()) {
-                                        Box(
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = "Bu sezona ait bölüm bulunamadı.",
-                                                color = Color.Gray,
-                                                fontSize = 14.sp
-                                            )
-                                        }
-                                    } else {
-                                        LazyColumn(
-                                            modifier = Modifier.fillMaxSize(),
-                                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            items(activeEpisodes, key = { it.id }) { episode ->
-                                                val isLastWatched = episode.id == lastWatchedEpisodeId
-                                                val selectEpisodeClick = remember(episode.id, activeSeason?.seasonNumber) {
-                                                    {
-                                                        val seasonObj = activeSeason ?: XtreamSeason(
-                                                            "Sezon ${selectedSeasonNum}",
-                                                            selectedSeasonNum
-                                                        )
-                                                        onEpisodeSelected(seasonObj, episode)
-                                                    }
-                                                }
-                                                EpisodeRowItem(
-                                                    episode = episode,
-                                                    seriesLogoUrl = series.logoUrl,
-                                                    isTvMode = isTvMode,
-                                                    isLastWatched = isLastWatched,
-                                                    onClick = selectEpisodeClick
-                                                )
-                                            }
-                                        }
-                                    }
                                 }
                             }
-                        } else {
-                            // Portrait/Compact View: Top-to-bottom layout
-                            Column(modifier = Modifier.fillMaxSize()) {
-                                // Top Row: Seasons horizontal bar
+                        }
+
+                        // Divider line separating the interactive controls from list
+                        HorizontalDivider(
+                            color = Color.White.copy(alpha = 0.08f),
+                            thickness = 1.dp,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+
+                        // Episodes Header
+                        val activeSeasonObj = seasons.find { it.seasonNumber == selectedSeasonNum }
+                        Text(
+                            text = "${activeSeasonObj?.name ?: "Bölümler"} (Yürütmek İçin Seçin)",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+
+                        // Scrollable List of Episodes below the selector
+                        val activeEpisodes = episodesBySeason[selectedSeasonNum] ?: emptyList()
+                        if (activeEpisodes.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Text(
-                                    text = "Sezonlar",
+                                    text = "Bu sezona ait bölüm bulunamadı.",
                                     color = Color.Gray,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(bottom = 6.dp)
+                                    fontSize = 14.sp
                                 )
-                                LazyRow(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 12.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    itemsIndexed(seasons, key = { _, s -> s.seasonNumber }) { idx, season ->
-                                        val isCurrent = season.seasonNumber == selectedSeasonNum
-                                        val selectSeasonClick = remember(season.seasonNumber) { { onSeasonSelected(season.seasonNumber) } }
-                                        val itemModifier = Modifier
-                                            .tvClickable(isTvMode = isTvMode, onClick = selectSeasonClick)
-                                        val finalModifier = if (idx == 0) {
-                                            itemModifier.focusRequester(firstItemFocusRequester)
-                                        } else {
-                                            itemModifier
-                                        }
-
-                                        Surface(
-                                            shape = RoundedCornerShape(16.dp),
-                                            color = if (isCurrent) NetflixRed else NetflixDarkGrey,
-                                            modifier = finalModifier
-                                        ) {
-                                            Text(
-                                                text = season.name,
-                                                color = Color.White,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(activeEpisodes, key = { it.id }) { episode ->
+                                    val isLastWatched = episode.id == lastWatchedEpisodeId
+                                    val selectEpisodeClick = remember(episode.id, activeSeasonObj?.seasonNumber) {
+                                        {
+                                            val seasonObj = activeSeasonObj ?: XtreamSeason(
+                                                "Sezon ${selectedSeasonNum}",
+                                                selectedSeasonNum
                                             )
+                                            onEpisodeSelected(seasonObj, episode)
                                         }
                                     }
-                                }
-
-                                // Bottom List: Episodes list taking up the remaining space
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxWidth()
-                                        .background(NetflixDarkGrey, RoundedCornerShape(8.dp))
-                                        .padding(12.dp)
-                                ) {
-                                    val activeSeason = seasons.find { it.seasonNumber == selectedSeasonNum }
-                                    val activeEpisodes = episodesBySeason[selectedSeasonNum] ?: emptyList()
-                                    if (activeEpisodes.isEmpty()) {
-                                        Box(
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = "Bu sezona ait bölüm bulunamadı.",
-                                                color = Color.Gray,
-                                                fontSize = 14.sp
-                                            )
-                                        }
-                                    } else {
-                                        LazyColumn(
-                                            modifier = Modifier.fillMaxSize(),
-                                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            items(activeEpisodes, key = { it.id }) { episode ->
-                                                val isLastWatched = episode.id == lastWatchedEpisodeId
-                                                val selectEpisodeClick = remember(episode.id, activeSeason?.seasonNumber) {
-                                                    {
-                                                        val seasonObj = activeSeason ?: XtreamSeason(
-                                                            "Sezon ${selectedSeasonNum}",
-                                                            selectedSeasonNum
-                                                        )
-                                                        onEpisodeSelected(seasonObj, episode)
-                                                    }
-                                                }
-                                                EpisodeRowItem(
-                                                    episode = episode,
-                                                    seriesLogoUrl = series.logoUrl,
-                                                    isTvMode = isTvMode,
-                                                    isLastWatched = isLastWatched,
-                                                    onClick = selectEpisodeClick
-                                                )
-                                            }
-                                        }
-                                    }
+                                    EpisodeRowItem(
+                                        episode = episode,
+                                        seriesLogoUrl = series.logoUrl,
+                                        isTvMode = isTvMode,
+                                        isLastWatched = isLastWatched,
+                                        onClick = selectEpisodeClick
+                                    )
                                 }
                             }
                         }

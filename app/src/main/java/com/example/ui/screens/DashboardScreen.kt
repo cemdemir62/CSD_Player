@@ -1,6 +1,9 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -178,10 +181,22 @@ fun MobileDashboard(
         result
     }
 
-    // Mobil için varsayılan öne çıkan (Showcase / Spotlight) video
-    val featuredChannel = remember(channels, selectedType) {
-        channels.firstOrNull { !it.logoUrl.isNullOrEmpty() } ?: channels.firstOrNull()
+    // Mobil için varsayılan dinamik öne çıkan (Showcase / Spotlight Billboards) video döngüsü (Netflix Tarzı)
+    val candidateSpotlights = remember(channels, selectedType) {
+        val withLogos = channels.filter { !it.logoUrl.isNullOrEmpty() }.take(5)
+        if (withLogos.isNotEmpty()) withLogos else channels.take(5)
     }
+    var spotlightIndex by remember(candidateSpotlights) { mutableStateOf(0) }
+    
+    LaunchedEffect(candidateSpotlights) {
+        if (candidateSpotlights.size > 1) {
+            while (true) {
+                kotlinx.coroutines.delay(8000) // Her 8 saniyede bir sonraki öne çıkan yayına geç
+                spotlightIndex = (spotlightIndex + 1) % candidateSpotlights.size
+            }
+        }
+    }
+    val featuredChannel = candidateSpotlights.getOrNull(spotlightIndex)
 
     Scaffold(
         topBar = {
@@ -1218,36 +1233,50 @@ fun NetflixRow(
     onChannelSelected: (IptvChannel) -> Unit,
     onToggleFavorite: (IptvChannel) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 10.dp)
-    ) {
-        // Row Title
-        Text(
-            text = title,
-            color = Color.White,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
-        )
+    var isRendered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        isRendered = true
+    }
 
-        // Row Content Scrolling
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp)
+    AnimatedVisibility(
+        visible = isRendered,
+        enter = fadeIn(animationSpec = androidx.compose.animation.core.tween(500)) + 
+                slideInHorizontally(
+                    initialOffsetX = { 60 },
+                    animationSpec = androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.LinearOutSlowInEasing)
+                )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp)
         ) {
-            items(channels, key = { it.uniqueId }) { channel ->
-                Box(
-                    modifier = Modifier.width(if (isLandscape) 130.dp else 95.dp)
-                ) {
-                    ChannelGridCard(
-                        channel = channel,
-                        isTvMode = false,
-                        isLandscape = isLandscape,
-                        onClick = { onChannelSelected(channel) },
-                        onToggleFav = { onToggleFavorite(channel) }
-                    )
+            // Row Title
+            Text(
+                text = title,
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+            )
+
+            // Row Content Scrolling
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp)
+            ) {
+                items(channels, key = { it.uniqueId }) { channel ->
+                    Box(
+                        modifier = Modifier.width(if (isLandscape) 130.dp else 95.dp)
+                    ) {
+                        ChannelGridCard(
+                            channel = channel,
+                            isTvMode = false,
+                            isLandscape = isLandscape,
+                            onClick = { onChannelSelected(channel) },
+                            onToggleFav = { onToggleFavorite(channel) }
+                        )
+                    }
                 }
             }
         }
@@ -1460,6 +1489,17 @@ fun ContinueWatchingCard(
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
+    val animatedProgressHeight by animateDpAsState(
+        targetValue = if (isFocused) 5.dp else 3.5.dp,
+        animationSpec = tween(durationMillis = 200),
+        label = "progress_height"
+    )
+    val animatedProgressColor by animateColorAsState(
+        targetValue = if (isFocused) NetflixRed else NetflixRed.copy(alpha = 0.6f),
+        animationSpec = tween(durationMillis = 200),
+        label = "progress_color"
+    )
+
     Card(
         colors = CardDefaults.cardColors(containerColor = Color(0xFF19191E)),
         border = BorderStroke(
@@ -1559,19 +1599,19 @@ fun ContinueWatchingCard(
                     )
                 }
 
-                // Red dynamic progress bar at the bottom edge of image
+                // Red active/inactive responsive interactive progress bar
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(3.5.dp)
-                        .background(Color.White.copy(alpha = 0.2f))
+                        .height(animatedProgressHeight)
+                        .background(Color.White.copy(alpha = 0.15f))
                         .align(Alignment.BottomStart)
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxHeight()
                             .fillMaxWidth(progress.coerceIn(0f, 1f))
-                            .background(NetflixRed)
+                            .background(animatedProgressColor)
                     )
                 }
             }
