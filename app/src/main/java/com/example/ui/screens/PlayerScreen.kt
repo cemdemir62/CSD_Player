@@ -124,6 +124,9 @@ fun PlayerScreen(
     var zapLockCategory by remember {
         mutableStateOf(sharedPrefs.getBoolean("zap_lock_category", false))
     }
+    var lowLatencyMode by remember {
+        mutableStateOf(sharedPrefs.getBoolean("low_latency_mode", true))
+    }
 
     val performZapping: (Boolean) -> Unit = { isNext ->
         if (zapLockCategory) {
@@ -236,14 +239,27 @@ fun PlayerScreen(
     }
 
     // Veri Akışı / Kanal Değiştiğinde Player'ı güncelle
-    LaunchedEffect(channel) {
+    LaunchedEffect(channel, lowLatencyMode) {
         isLoading = true
         hasError = false
         errorMessage = ""
         exoPlayer.stop()
         exoPlayer.clearMediaItems()
         
-        val mediaItem = MediaItem.fromUri(channel.streamUrl)
+        val mediaItem = if (channel.type == "LIVE" && lowLatencyMode) {
+            MediaItem.Builder()
+                .setUri(channel.streamUrl)
+                .setLiveConfiguration(
+                    MediaItem.LiveConfiguration.Builder()
+                        .setTargetOffsetMs(3000)     // Target 3 seconds offset from live edge
+                        .setMinPlaybackSpeed(0.95f)   // Slow down slightly if buffer is low
+                        .setMaxPlaybackSpeed(1.05f)   // Catch up to live edge if ahead
+                        .build()
+                )
+                .build()
+        } else {
+            MediaItem.fromUri(channel.streamUrl)
+        }
         exoPlayer.setMediaItem(mediaItem)
         exoPlayer.prepare()
         
@@ -1162,6 +1178,40 @@ fun PlayerScreen(
                                             )
                                         }
                                     }
+
+                                    // Düşük Gecikme Modu (Low Latency / Hızlı Yayın) Butonu
+                                    if (channel.type == "LIVE") {
+                                        val lowLatencyInteractionSource = remember { MutableInteractionSource() }
+                                        Button(
+                                            onClick = {
+                                                lowLatencyMode = !lowLatencyMode
+                                                sharedPrefs.edit().putBoolean("low_latency_mode", lowLatencyMode).apply()
+                                            },
+                                            interactionSource = lowLatencyInteractionSource,
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (lowLatencyMode) NetflixRed else NetflixLightGrey
+                                            ),
+                                            shape = MaterialTheme.shapes.small,
+                                            modifier = Modifier
+                                                .tvFocusBorder(isTvMode = isTvMode, interactionSource = lowLatencyInteractionSource, shape = MaterialTheme.shapes.small)
+                                                .testTag("player_low_latency_button")
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Bolt,
+                                                    contentDescription = null,
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = if (lowLatencyMode) "Düşük Gecikme: Açık" else "Düşük Gecikme: Kapalı",
+                                                    color = Color.White,
+                                                    fontSize = 11.sp
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
 
                                 // Row 2: Secondary customization & auxiliary tools
@@ -1400,6 +1450,35 @@ fun PlayerScreen(
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold
                                         )
+                                    }
+                                }
+
+                                // 8. Düşük Gecikme Modu
+                                if (channel.type == "LIVE") {
+                                    Button(
+                                        onClick = {
+                                            lowLatencyMode = !lowLatencyMode
+                                            sharedPrefs.edit().putBoolean("low_latency_mode", lowLatencyMode).apply()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (lowLatencyMode) NetflixRed else NetflixLightGrey
+                                        ),
+                                        shape = RoundedCornerShape(20.dp),
+                                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                                        modifier = Modifier
+                                            .height(38.dp)
+                                            .testTag("player_low_latency_button")
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.Bolt, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = if (lowLatencyMode) "Düşük Gecikme: Açık" else "Düşük Gecikme: Kapalı",
+                                                color = Color.White,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
                                     }
                                 }
                             }

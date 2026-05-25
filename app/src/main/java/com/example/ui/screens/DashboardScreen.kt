@@ -119,6 +119,8 @@ fun MobileDashboard(
     onResetMode: () -> Unit,
     onRefreshPlaylist: () -> Unit
 ) {
+    var showSpeedTestDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
     val visibleLimit = remember(selectedType, selectedGroup, searchQuery) { mutableStateOf(80) }
     val displayedChannels = remember(channels, visibleLimit.value) {
         channels.take(visibleLimit.value)
@@ -147,31 +149,47 @@ fun MobileDashboard(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "CSD Player",
-                            color = NetflixRed,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 20.sp,
-                            modifier = Modifier.padding(end = 12.dp)
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = Color.DarkGray,
-                            modifier = Modifier.padding(top = 2.dp)
-                        ) {
-                            Text(
-                                text = playlist.name.take(12),
-                                color = Color.White,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                },
-                actions = {
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "CSD Player",
+                    color = NetflixRed,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 20.sp,
+                    modifier = Modifier.padding(end = 12.dp)
+                )
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = Color.DarkGray,
+                    modifier = Modifier.padding(top = 2.dp)
+                ) {
+                    Text(
+                        text = playlist.name.take(12),
+                        color = Color.White,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+        },
+        actions = {
+            // Ayarlar & Abonelik
+            IconButton(
+                onClick = { showSettingsDialog = true },
+                modifier = Modifier.testTag("action_settings")
+            ) {
+                Icon(Icons.Default.Settings, "Ayarlar & Abonelik", tint = Color.White)
+            }
+
+            // Hız Testi (Speed Test)
+            IconButton(
+                onClick = { showSpeedTestDialog = true },
+                modifier = Modifier.testTag("action_speed_test")
+            ) {
+                Icon(Icons.Default.Speed, "İnternet Hız Ölçer", tint = Color.White)
+            }
+
                     // Verileri Yenile
                     IconButton(
                         onClick = onRefreshPlaylist,
@@ -433,6 +451,26 @@ fun MobileDashboard(
             }
         }
     }
+
+    SpeedTestDialog(
+        show = showSpeedTestDialog,
+        isTvMode = false,
+        onDismiss = { showSpeedTestDialog = false }
+    )
+
+    SettingsDialog(
+        show = showSettingsDialog,
+        playlist = playlist,
+        channels = channels,
+        isTvMode = false,
+        onDismiss = { showSettingsDialog = false },
+        onResetMode = onResetMode,
+        onRefreshPlaylist = onRefreshPlaylist,
+        onLaunchSpeedTest = {
+            showSettingsDialog = false
+            showSpeedTestDialog = true
+        }
+    )
 }
 
 // ==========================================
@@ -456,6 +494,8 @@ fun TvDashboard(
     onResetMode: () -> Unit,
     onRefreshPlaylist: () -> Unit
 ) {
+    var showSpeedTestDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
     val visibleLimit = remember(selectedType, selectedGroup, searchQuery) { mutableStateOf(80) }
     val displayedChannels = remember(channels, visibleLimit.value) {
         channels.take(visibleLimit.value)
@@ -494,6 +534,22 @@ fun TvDashboard(
                     }
                 },
                 actions = {
+                    // Ayarlar & Abonelik
+                    IconButton(
+                        onClick = { showSettingsDialog = true },
+                        modifier = Modifier.testTag("action_settings")
+                    ) {
+                        Icon(Icons.Default.Settings, "Ayarlar & Abonelik", tint = Color.White)
+                    }
+
+                    // Hız Testi (Speed Test)
+                    IconButton(
+                        onClick = { showSpeedTestDialog = true },
+                        modifier = Modifier.testTag("action_speed_test")
+                    ) {
+                        Icon(Icons.Default.Speed, "İnternet Hız Ölçer", tint = Color.White)
+                    }
+
                     // Verileri Yenile
                     IconButton(
                         onClick = onRefreshPlaylist,
@@ -729,6 +785,26 @@ fun TvDashboard(
             }
         }
     }
+
+    SpeedTestDialog(
+        show = showSpeedTestDialog,
+        isTvMode = true,
+        onDismiss = { showSpeedTestDialog = false }
+    )
+
+    SettingsDialog(
+        show = showSettingsDialog,
+        playlist = playlist,
+        channels = channels,
+        isTvMode = true,
+        onDismiss = { showSettingsDialog = false },
+        onResetMode = onResetMode,
+        onRefreshPlaylist = onRefreshPlaylist,
+        onLaunchSpeedTest = {
+            showSettingsDialog = false
+            showSpeedTestDialog = true
+        }
+    )
 }
 
 // ==========================================
