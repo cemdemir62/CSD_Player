@@ -15,9 +15,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -427,9 +427,9 @@ fun SettingsPanelContent(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    MetricBox(weight = 1f, title = "Canlı TV", count = "$liveCount", icon = Icons.Default.Tv, tint = Color(0xFF2196F3))
-                    MetricBox(weight = 1f, title = "Filmler", count = "$movieCount", icon = Icons.Default.Movie, tint = Color(0xFFE91E63))
-                    MetricBox(weight = 1f, title = "Diziler", count = "$seriesCount", icon = Icons.Default.VideoLibrary, tint = Color(0xFFFF9800))
+                    MetricBox(modifier = Modifier.weight(1f), title = "Canlı TV", count = "$liveCount", icon = Icons.Default.Tv, tint = Color(0xFF2196F3))
+                    MetricBox(modifier = Modifier.weight(1f), title = "Filmler", count = "$movieCount", icon = Icons.Default.Movie, tint = Color(0xFFE91E63))
+                    MetricBox(modifier = Modifier.weight(1f), title = "Diziler", count = "$seriesCount", icon = Icons.Default.VideoLibrary, tint = Color(0xFFFF9800))
                 }
 
                 // Info entries
@@ -496,7 +496,7 @@ fun SettingsPanelContent(
                     interactionSource = switchInteraction,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .focusable(switchInteraction)
+                        .focusable(interactionSource = switchInteraction)
                         .tvFocusBorder(isTvMode = isTvMode, interactionSource = switchInteraction)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -578,7 +578,7 @@ fun SettingsPanelContent(
                         interactionSource = clearRecentInteraction,
                         modifier = Modifier
                             .height(36.dp)
-                            .focusable(clearRecentInteraction)
+                            .focusable(interactionSource = clearRecentInteraction)
                             .tvFocusBorder(isTvMode = isTvMode, interactionSource = clearRecentInteraction)
                     ) {
                         Text("Temizle", color = Color.White, fontSize = 11.sp)
@@ -619,7 +619,7 @@ fun SettingsPanelContent(
                         interactionSource = forceRefreshInteraction,
                         modifier = Modifier
                             .height(36.dp)
-                            .focusable(forceRefreshInteraction)
+                            .focusable(interactionSource = forceRefreshInteraction)
                             .tvFocusBorder(isTvMode = isTvMode, interactionSource = forceRefreshInteraction)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -678,7 +678,7 @@ fun SettingsPanelContent(
                         interactionSource = runSpeedInteraction,
                         modifier = Modifier
                             .height(36.dp)
-                            .focusable(runSpeedInteraction)
+                            .focusable(interactionSource = runSpeedInteraction)
                             .tvFocusBorder(isTvMode = isTvMode, interactionSource = runSpeedInteraction)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -739,7 +739,7 @@ fun InfoRow(label: String, value: String) {
 
 @Composable
 fun MetricBox(
-    weight: Float,
+    modifier: Modifier = Modifier,
     title: String,
     count: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -748,7 +748,7 @@ fun MetricBox(
     Surface(
         shape = RoundedCornerShape(10.dp),
         color = Color(0xFF141414),
-        modifier = Modifier.weight(weight)
+        modifier = modifier
     ) {
         Column(
             modifier = Modifier.padding(10.dp),
@@ -796,7 +796,7 @@ fun SettingsToggleRow(
                 indication = androidx.compose.foundation.LocalIndication.current,
                 onClick = { onCheckedChange(!checked) }
             )
-            .focusable(interactionSource)
+            .focusable(interactionSource = interactionSource)
             .tvFocusBorder(isTvMode = isTvMode, interactionSource = interactionSource)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -831,11 +831,6 @@ fun SettingsToggleRow(
     }
 }
 
-// Simple modifier helper extension for scale factor safely
-fun Modifier.scale(scale: Float): Modifier = this.then(
-    androidx.compose.ui.draw.scale(scale)
-)
-
 @Composable
 fun TvSettingsTabButton(
     label: String,
@@ -856,7 +851,7 @@ fun TvSettingsTabButton(
                 indication = androidx.compose.foundation.LocalIndication.current,
                 onClick = onClick
             )
-            .focusable(interactionSource)
+            .focusable(interactionSource = interactionSource)
             .tvFocusBorder(isTvMode = isTvMode, interactionSource = interactionSource)
     ) {
         Row(
