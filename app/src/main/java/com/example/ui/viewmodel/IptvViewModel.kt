@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.local.AppDatabase
 import com.example.data.model.IptvChannel
 import com.example.data.model.Playlist
+import com.example.data.model.UserProfile
 import com.example.data.repository.IptvRepository
 import com.example.data.model.XtreamSeason
 import com.example.data.model.XtreamEpisode
@@ -31,11 +32,38 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getDatabase(application)
     private val repository = IptvRepository(database.iptvDao())
 
-    val playlists: StateFlow<List<Playlist>> = repository.playlists
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    // 1. Profil Yönetim Yapıları
+    private val _profiles = MutableStateFlow<List<UserProfile>>(emptyList())
+    val profiles = _profiles.asStateFlow()
+
+    private val _selectedProfile = MutableStateFlow<UserProfile?>(null)
+    val selectedProfile = _selectedProfile.asStateFlow()
+
+    private val _profileFavorites = MutableStateFlow<Set<String>>(emptySet())
+    val profileFavorites = _profileFavorites.asStateFlow()
 
     private val _selectedPlaylist = MutableStateFlow<Playlist?>(null)
     val selectedPlaylist = _selectedPlaylist.asStateFlow()
+
+    private val _continueWatchingData = MutableStateFlow<Map<String, Pair<Long, Long>>>(emptyMap())
+    val continueWatchingData = _continueWatchingData.asStateFlow()
+
+    val continueWatchingChannels: StateFlow<List<IptvChannel>> = combine(_continueWatchingData, _selectedPlaylist) { cwMap, playlist ->
+        cwMap to playlist
+    }.flatMapLatest { (cwMap, playlist) ->
+        val playlistId = playlist?.id ?: return@flatMapLatest flowOf(emptyList<IptvChannel>())
+        val ids = cwMap.keys.toList()
+        if (ids.isEmpty()) return@flatMapLatest flowOf(emptyList())
+        
+        repository.getChannelsByUniqueIdsFlow(ids).map { list ->
+            list.filter { it.playlistId == playlistId }
+                .sortedBy { ids.indexOf(it.uniqueId) }
+        }
+    }.flowOn(Dispatchers.Default)
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val playlists: StateFlow<List<Playlist>> = repository.playlists
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Uygulama Modu: "TV" (D-Pad Kumanda) veya "MOBIL" (Touch) - null ise seçim ekranına yönlendirilir
     private val _appMode = MutableStateFlow<String?>(sharedPrefs.getString("app_mode", null))
@@ -44,6 +72,7 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
     private var hasAutoLoggedIn = false
 
     init {
+        loadProfilesFromPrefs()
         viewModelScope.launch {
             // Wait for the first non-empty emissions of playlist from database
             playlists.first { it.isNotEmpty() }.let { list ->
@@ -232,20 +261,42 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
         _selectedGroup,
         _searchQuery
     ) { playlist, type, group, query ->
-        playlist to Triple(type, group, query)
-    }.flatMapLatest { (playlist, filters) ->
-        val playlistId = playlist?.id ?: return@flatMapLatest flowOf(emptyList())
-        val (type, group, query) = filters
-
-        when {
+        Triple(playlist, type, group) to query
+    }.flatMapLatest { (triple, query) ->
+        val (playlist, type, group) = triple
+        val playlistId = playlist?.id ?: return@flatMapLatest flowOf(emptyList<IptvChannel>())
+        
+        val flow = when {
             query.isNotEmpty() -> {
                 val dbType = if (type == "FAVORITE" || type == "RECENT") "LIVE" else type
                 repository.searchChannels(playlistId, dbType, query)
             }
-            type == "FAVORITE" -> repository.getFavorites(playlistId)
-            type == "RECENT"   -> repository.getRecents(playlistId)
+            type == "FAVORITE" -> {
+                val favSet = _profileFavorites.value
+                if (favSet.isNotEmpty()) {
+                    repository.getChannelsByUniqueIdsFlow(favSet.toList())
+                } else {
+                    flowOf(emptyList())
+                }
+            }
+            type == "RECENT" -> repository.getRecents(playlistId)
             group == null || group == "Hepsi" -> repository.getChannelsByType(playlistId, type)
             else -> repository.getChannelsByGroup(playlistId, type, group)
+        }
+
+        combine(flow, _profileFavorites, _selectedProfile) { list, favSet, profile ->
+            var resultList = list
+            if (profile?.isKids == true) {
+                resultList = list.filter { chan ->
+                    val nameLower = chan.name.lowercase()
+                    val groupLower = (chan.groupTitle ?: "").lowercase()
+                    val isAdult = groupLower.contains("18+") || groupLower.contains("adult") || groupLower.contains("xx") || groupLower.contains("porn") || nameLower.contains("18+") || nameLower.contains("porn")
+                    !isAdult
+                }
+            }
+            resultList.map { chan ->
+                chan.copy(isFavorite = favSet.contains(chan.uniqueId))
+            }
         }
     }.flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -346,13 +397,236 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleFavorite(channel: IptvChannel) {
-        viewModelScope.launch {
-            repository.toggleFavorite(channel.uniqueId, !channel.isFavorite)
-            // Canlı izlenmekte olan oynatıcı bilgisini tazeleyelim
-            if (_activeChannel.value?.uniqueId == channel.uniqueId) {
-                _activeChannel.value = _activeChannel.value?.copy(isFavorite = !channel.isFavorite)
+        val profile = _selectedProfile.value
+        if (profile != null) {
+            val currentSet = sharedPrefs.getStringSet("profile_${profile.id}_favorites", emptySet()) ?: emptySet()
+            val newSet = currentSet.toMutableSet()
+            if (newSet.contains(channel.uniqueId)) {
+                newSet.remove(channel.uniqueId)
+            } else {
+                newSet.add(channel.uniqueId)
+            }
+            sharedPrefs.edit().putStringSet("profile_${profile.id}_favorites", newSet).apply()
+            _profileFavorites.value = newSet
+            
+            viewModelScope.launch {
+                repository.toggleFavorite(channel.uniqueId, newSet.contains(channel.uniqueId))
+            }
+        } else {
+            viewModelScope.launch {
+                repository.toggleFavorite(channel.uniqueId, !channel.isFavorite)
             }
         }
+        // Canlı izlenmekte olan oynatıcı bilgisini tazeleyelim
+        if (_activeChannel.value?.uniqueId == channel.uniqueId) {
+            _activeChannel.value = _activeChannel.value?.copy(isFavorite = !channel.isFavorite)
+        }
+    }
+
+    // --- PROFIL YÖNETIMI VE YARIM KALANLARA DEVAM ET YARDIMCI METOTLARI ---
+    
+    private fun loadProfilesFromPrefs() {
+        val jsonStr = sharedPrefs.getString("user_profiles_json", null)
+        if (jsonStr != null) {
+            try {
+                val list = mutableListOf<UserProfile>()
+                val arr = org.json.JSONArray(jsonStr)
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    list.add(
+                        UserProfile(
+                            id = obj.getString("id"),
+                            name = obj.getString("name"),
+                            avatarColor = obj.getString("avatarColor"),
+                            avatarEmoji = obj.getString("avatarEmoji"),
+                            isKids = obj.optBoolean("isKids", false)
+                        )
+                    )
+                }
+                _profiles.value = list
+            } catch (e: Exception) {
+                Log.e("IptvViewModel", "Error loading profiles: ${e.message}")
+                initializeDefaultProfiles()
+            }
+        } else {
+            initializeDefaultProfiles()
+        }
+        
+        // Auto-select last profiles if any
+        val lastPid = sharedPrefs.getString("last_active_profile_id", null)
+        if (lastPid != null) {
+            val found = _profiles.value.find { it.id == lastPid }
+            if (found != null) {
+                selectProfile(found)
+            }
+        }
+    }
+
+    private fun initializeDefaultProfiles() {
+        val defaults = listOf(
+            UserProfile("p1", "CSD Premium", "#E50914", "🍿", false),
+            UserProfile("p2", "Yetişkin", "#8E24AA", "👑", false),
+            UserProfile("p3", "Çocuk Modu", "#00897B", "🦖", true)
+        )
+        saveProfilesToPrefs(defaults)
+    }
+
+    private fun saveProfilesToPrefs(list: List<UserProfile>) {
+        _profiles.value = list
+        try {
+            val arr = org.json.JSONArray()
+            for (p in list) {
+                val obj = org.json.JSONObject()
+                obj.put("id", p.id)
+                obj.put("name", p.name)
+                obj.put("avatarColor", p.avatarColor)
+                obj.put("avatarEmoji", p.avatarEmoji)
+                obj.put("isKids", p.isKids)
+                arr.put(obj)
+            }
+            sharedPrefs.edit().putString("user_profiles_json", arr.toString()).apply()
+        } catch (e: Exception) {
+            Log.e("IptvViewModel", "Error saving profiles: ${e.message}")
+        }
+    }
+
+    fun selectProfile(profile: UserProfile?) {
+        _selectedProfile.value = profile
+        if (profile != null) {
+            sharedPrefs.edit().putString("last_active_profile_id", profile.id).apply()
+            
+            // Favorileri yükle
+            val favs = sharedPrefs.getStringSet("profile_${profile.id}_favorites", emptySet()) ?: emptySet()
+            _profileFavorites.value = favs
+            
+            // Yarım Kalanları yükle
+            loadContinueWatchingForProfile(profile.id)
+        } else {
+            sharedPrefs.edit().remove("last_active_profile_id").apply()
+            _profileFavorites.value = emptySet()
+            _continueWatchingData.value = emptyMap()
+        }
+    }
+
+    fun addProfile(name: String, color: String, emoji: String, isKids: Boolean) {
+        val newProfile = UserProfile(
+            id = "p_" + System.currentTimeMillis(),
+            name = name,
+            avatarColor = color,
+            avatarEmoji = emoji,
+            isKids = isKids
+        )
+        val current = _profiles.value.toMutableList()
+        current.add(newProfile)
+        saveProfilesToPrefs(current)
+    }
+
+    fun deleteProfile(profile: UserProfile) {
+        val current = _profiles.value.toMutableList()
+        current.removeAll { it.id == profile.id }
+        if (current.isEmpty()) {
+            val defaults = listOf(
+                UserProfile("p1", "CSD Premium", "#E50914", "🍿", false)
+            )
+            saveProfilesToPrefs(defaults)
+        } else {
+            saveProfilesToPrefs(current)
+        }
+        if (_selectedProfile.value?.id == profile.id) {
+            selectProfile(null)
+        }
+    }
+
+    private fun loadContinueWatchingForProfile(profileId: String) {
+        val jsonStr = sharedPrefs.getString("profile_${profileId}_continue_watching_json", null)
+        val dataMap = mutableMapOf<String, Pair<Long, Long>>()
+        if (jsonStr != null) {
+            try {
+                val arr = org.json.JSONArray(jsonStr)
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    val uid = obj.getString("uid")
+                    val pos = obj.getLong("pos")
+                    val dur = obj.getLong("dur")
+                    dataMap[uid] = Pair(pos, dur)
+                }
+            } catch (e: Exception) {
+                Log.e("IptvViewModel", "Error loading continue watching: ${e.message}")
+            }
+        }
+        _continueWatchingData.value = dataMap
+    }
+
+    fun updatePlaybackProgress(channel: IptvChannel, position: Long, duration: Long) {
+        val profile = _selectedProfile.value ?: return
+        val profileId = profile.id
+        
+        val savedPosKey = "resume_pos_profile_${profileId}_${channel.uniqueId}"
+        sharedPrefs.edit().putLong(savedPosKey, position).apply()
+        
+        val currentList = sharedPrefs.getString("profile_${profileId}_continue_watching_json", null)
+        val itemsList = mutableListOf<org.json.JSONObject>()
+        
+        try {
+            if (currentList != null) {
+                val arr = org.json.JSONArray(currentList)
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    if (obj.getString("uid") != channel.uniqueId) {
+                        itemsList.add(obj)
+                    }
+                }
+            }
+        } catch (e: Exception) {}
+        
+        val newObj = org.json.JSONObject()
+        newObj.put("uid", channel.uniqueId)
+        newObj.put("pos", position)
+        newObj.put("dur", duration)
+        newObj.put("ts", System.currentTimeMillis())
+        itemsList.add(0, newObj)
+        
+        val cappedList = itemsList.take(20)
+        
+        val newArr = org.json.JSONArray()
+        val dataMap = mutableMapOf<String, Pair<Long, Long>>()
+        for (item in cappedList) {
+            newArr.put(item)
+            dataMap[item.getString("uid")] = Pair(item.getLong("pos"), item.getLong("dur"))
+        }
+        
+        sharedPrefs.edit().putString("profile_${profileId}_continue_watching_json", newArr.toString()).apply()
+        _continueWatchingData.value = dataMap
+    }
+
+    fun removeFromContinueWatching(channelUniqueId: String) {
+        val profile = _selectedProfile.value ?: return
+        val profileId = profile.id
+        
+        val currentList = sharedPrefs.getString("profile_${profileId}_continue_watching_json", null) ?: return
+        val itemsList = mutableListOf<org.json.JSONObject>()
+        try {
+            val arr = org.json.JSONArray(currentList)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                if (obj.getString("uid") != channelUniqueId) {
+                    itemsList.add(obj)
+                }
+            }
+            
+            val newArr = org.json.JSONArray()
+            val dataMap = mutableMapOf<String, Pair<Long, Long>>()
+            for (item in itemsList) {
+                newArr.put(item)
+                dataMap[item.getString("uid")] = Pair(item.getLong("pos"), item.getLong("dur"))
+            }
+            sharedPrefs.edit().putString("profile_${profileId}_continue_watching_json", newArr.toString()).apply()
+            
+            val savedPosKey = "resume_pos_profile_${profileId}_$channelUniqueId"
+            sharedPrefs.edit().remove(savedPosKey).apply()
+            
+            _continueWatchingData.value = dataMap
+        } catch (e: Exception) {}
     }
 
     // Player sırasında zapping işlemleri

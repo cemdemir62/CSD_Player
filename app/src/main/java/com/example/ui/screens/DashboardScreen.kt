@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
@@ -41,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import coil.request.ImageRequest
 import com.example.data.model.IptvChannel
 import com.example.data.model.Playlist
+import com.example.data.model.UserProfile
 import com.example.ui.theme.NetflixDarkGrey
 import com.example.ui.theme.NetflixLightGrey
 import com.example.ui.theme.NetflixRed
@@ -55,6 +57,11 @@ fun DashboardScreen(
     selectedGroup: String?,
     searchQuery: String,
     isTvMode: Boolean,
+    selectedProfile: UserProfile,
+    onSwitchProfile: () -> Unit,
+    continueWatchingList: List<IptvChannel> = emptyList(),
+    continueWatchingProgress: Map<String, Pair<Long, Long>> = emptyMap(),
+    onRemoveContinueWatching: (IptvChannel) -> Unit = {},
     onTypeSelected: (String) -> Unit,
     onGroupSelected: (String?) -> Unit,
     onSearchChanged: (String) -> Unit,
@@ -72,6 +79,11 @@ fun DashboardScreen(
             selectedType = selectedType,
             selectedGroup = selectedGroup,
             searchQuery = searchQuery,
+            selectedProfile = selectedProfile,
+            onSwitchProfile = onSwitchProfile,
+            continueWatchingList = continueWatchingList,
+            continueWatchingProgress = continueWatchingProgress,
+            onRemoveContinueWatching = onRemoveContinueWatching,
             onTypeSelected = onTypeSelected,
             onGroupSelected = onGroupSelected,
             onSearchChanged = onSearchChanged,
@@ -89,6 +101,11 @@ fun DashboardScreen(
             selectedType = selectedType,
             selectedGroup = selectedGroup,
             searchQuery = searchQuery,
+            selectedProfile = selectedProfile,
+            onSwitchProfile = onSwitchProfile,
+            continueWatchingList = continueWatchingList,
+            continueWatchingProgress = continueWatchingProgress,
+            onRemoveContinueWatching = onRemoveContinueWatching,
             onTypeSelected = onTypeSelected,
             onGroupSelected = onGroupSelected,
             onSearchChanged = onSearchChanged,
@@ -113,6 +130,11 @@ fun MobileDashboard(
     selectedType: String,
     selectedGroup: String?,
     searchQuery: String,
+    selectedProfile: UserProfile,
+    onSwitchProfile: () -> Unit,
+    continueWatchingList: List<IptvChannel> = emptyList(),
+    continueWatchingProgress: Map<String, Pair<Long, Long>> = emptyMap(),
+    onRemoveContinueWatching: (IptvChannel) -> Unit = {},
     onTypeSelected: (String) -> Unit,
     onGroupSelected: (String?) -> Unit,
     onSearchChanged: (String) -> Unit,
@@ -219,6 +241,27 @@ fun MobileDashboard(
                         modifier = Modifier.testTag("action_reset_mode")
                     ) {
                         Icon(Icons.Default.Tv, "TV Moduna Geç", tint = Color.White)
+                    }
+
+                    // Profil Değiştir (Avatar Button)
+                    val avatarColor = remember(selectedProfile.avatarColor) {
+                        try {
+                            Color(android.graphics.Color.parseColor(selectedProfile.avatarColor))
+                        } catch (e: Exception) {
+                            NetflixRed
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 6.dp)
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(avatarColor)
+                            .clickable { onSwitchProfile() }
+                            .testTag("action_switch_profile"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(selectedProfile.avatarEmoji, fontSize = 16.sp)
                     }
 
                     // Sunucudan Çıkış
@@ -441,6 +484,46 @@ fun MobileDashboard(
                         }
                     }
 
+                    // 1.1 Yarım Kalanlara Devam Et (Continue Watching) Row - ONLY on Mobile
+                    if (continueWatchingList.isNotEmpty()) {
+                        item {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 10.dp)
+                            ) {
+                                Text(
+                                    text = "Kaldığınız Yerden Devam Edin",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+                                )
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    items(continueWatchingList, key = { "cw_m_" + it.uniqueId }) { chan ->
+                                        val times = continueWatchingProgress[chan.uniqueId]
+                                        val progressPercent = if (times != null && times.second > 0) {
+                                            (times.first.toFloat() / times.second.toFloat()).coerceIn(0f, 1f)
+                                        } else {
+                                            0.5f // Default
+                                        }
+                                        ContinueWatchingCard(
+                                            channel = chan,
+                                            isTvMode = false,
+                                            progress = progressPercent,
+                                            onPlay = { onChannelSelected(chan) },
+                                            onRemove = { onRemoveContinueWatching(chan) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // 2. Netflix Yatay Satırları
                     val categorizedGroups = groups.take(8) // Aşırı yüklenme olmasın diye ilk 8 kategoriyi basıyoruz
                     if (categorizedGroups.isEmpty() && channels.isNotEmpty()) {
@@ -516,6 +599,11 @@ fun TvDashboard(
     selectedType: String,
     selectedGroup: String?,
     searchQuery: String,
+    selectedProfile: UserProfile,
+    onSwitchProfile: () -> Unit,
+    continueWatchingList: List<IptvChannel> = emptyList(),
+    continueWatchingProgress: Map<String, Pair<Long, Long>> = emptyMap(),
+    onRemoveContinueWatching: (IptvChannel) -> Unit = {},
     onTypeSelected: (String) -> Unit,
     onGroupSelected: (String?) -> Unit,
     onSearchChanged: (String) -> Unit,
@@ -596,6 +684,34 @@ fun TvDashboard(
                         modifier = Modifier.testTag("action_reset_mode")
                     ) {
                         Icon(Icons.Default.PhoneAndroid, "Mobil Moduna Geç", tint = Color.White)
+                    }
+
+                    // Profil Değiştir (Avatar Button)
+                    val avatarColor = remember(selectedProfile.avatarColor) {
+                        try {
+                            Color(android.graphics.Color.parseColor(selectedProfile.avatarColor))
+                        } catch (e: Exception) {
+                            NetflixRed
+                        }
+                    }
+                    val switchProfInteraction = remember { MutableInteractionSource() }
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 6.dp)
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(avatarColor)
+                            .focusable(interactionSource = switchProfInteraction)
+                            .tvFocusBorder(isTvMode = true, interactionSource = switchProfInteraction, shape = RoundedCornerShape(8.dp))
+                            .clickable(
+                                interactionSource = switchProfInteraction,
+                                indication = androidx.compose.material3.ripple(),
+                                onClick = onSwitchProfile
+                            )
+                            .testTag("action_switch_profile_tv"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(selectedProfile.avatarEmoji, fontSize = 18.sp)
                     }
 
                     // Sunucudan Çıkış
@@ -821,6 +937,45 @@ fun TvDashboard(
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
+                            // "Yarım Kalanlara Devam Et" (TV Row)
+                            if (continueWatchingList.isNotEmpty() && searchQuery.isEmpty()) {
+                                item(span = { GridItemSpan(maxLineSpan) }) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 16.dp)
+                                    ) {
+                                        Text(
+                                            text = "Yarım Kalanlara Devam Et",
+                                            color = Color.White,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(bottom = 10.dp, start = 4.dp)
+                                        )
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            items(continueWatchingList, key = { "cw_tv_" + it.uniqueId }) { chan ->
+                                                val times = continueWatchingProgress[chan.uniqueId]
+                                                val progressPercent = if (times != null && times.second > 0) {
+                                                    (times.first.toFloat() / times.second.toFloat()).coerceIn(0f, 1f)
+                                                } else {
+                                                    0.5f
+                                                }
+                                                ContinueWatchingCard(
+                                                    channel = chan,
+                                                    isTvMode = true,
+                                                    progress = progressPercent,
+                                                    onPlay = { onChannelSelected(chan) },
+                                                    onRemove = { onRemoveContinueWatching(chan) }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             items(displayedChannels, key = { it.uniqueId }) { channel ->
                                 val clickAction = remember(channel.uniqueId) { { onChannelSelected(channel) } }
                                 val toggleFavAction = remember(channel.uniqueId) { { onToggleFavorite(channel) } }
@@ -1288,6 +1443,162 @@ fun EmptyState() {
                     fontSize = 11.sp,
                     lineHeight = 16.sp,
                     textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ContinueWatchingCard(
+    channel: IptvChannel,
+    isTvMode: Boolean,
+    progress: Float,
+    onPlay: () -> Unit,
+    onRemove: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF19191E)),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isFocused && isTvMode) NetflixRed else Color.White.copy(alpha = 0.08f)
+        ),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier
+            .width(if (isTvMode) 180.dp else 140.dp)
+            .tvFocusBorder(isTvMode = isTvMode, interactionSource = interactionSource, shape = RoundedCornerShape(12.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = androidx.compose.material3.ripple(),
+                onClick = onPlay
+            )
+            .focusable()
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (isTvMode) 100.dp else 84.dp)
+                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                    .background(Color.Black)
+            ) {
+                // Afiş / Logo
+                if (!channel.logoUrl.isNullOrEmpty()) {
+                    val context = LocalContext.current
+                    val imageRequest = remember(channel.logoUrl) {
+                        ImageRequest.Builder(context)
+                            .data(channel.logoUrl)
+                            .crossfade(true)
+                            .build()
+                    }
+                    AsyncImage(
+                        model = imageRequest,
+                        contentDescription = channel.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(Color(0xFF282830), Color(0xFF121216))
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayCircle,
+                            contentDescription = null,
+                            tint = Color.Gray.copy(alpha = 0.5f),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                // Play triangle overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = "Oynat",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                            .padding(4.dp)
+                    )
+                }
+
+                // Delete 'X' button
+                IconButton(
+                    onClick = onRemove,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .size(22.dp)
+                        .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Listeden Çıkar",
+                        tint = Color.LightGray,
+                        modifier = Modifier.size(10.dp)
+                    )
+                }
+
+                // Red dynamic progress bar at the bottom edge of image
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.5.dp)
+                        .background(Color.White.copy(alpha = 0.2f))
+                        .align(Alignment.BottomStart)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(progress.coerceIn(0f, 1f))
+                            .background(NetflixRed)
+                    )
+                }
+            }
+
+            // Bottom metadata label Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = channel.name,
+                    color = Color.White,
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "%${(progress * 100).toInt()}",
+                    color = Color.Gray,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(start = 4.dp)
                 )
             }
         }

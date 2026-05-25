@@ -52,3 +52,11 @@ data class XtreamEpisode(
     val logoUrl: String? = null
 ) : Serializable
 
+data class UserProfile(
+    val id: String,
+    val name: String,
+    val avatarColor: String, // Hex string
+    val avatarEmoji: String, // Emoji representation
+    val isKids: Boolean = false
+) : Serializable
+

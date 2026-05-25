@@ -102,4 +102,11 @@ class IptvRepository(private val iptvDao: IptvDao) {
     suspend fun getChannelCount(playlistId: Long): Int = withContext(Dispatchers.IO) {
         iptvDao.getChannelCount(playlistId)
     }
+
+    suspend fun getChannelsByUniqueIds(ids: List<String>): List<IptvChannel> = withContext(Dispatchers.IO) {
+        iptvDao.getChannelsByUniqueIds(ids)
+    }
+
+    fun getChannelsByUniqueIdsFlow(ids: List<String>): Flow<List<IptvChannel>> =
+        iptvDao.getChannelsByUniqueIdsFlow(ids)
 }

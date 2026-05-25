@@ -53,4 +53,10 @@ interface IptvDao {
 
     @Query("SELECT COUNT(*) FROM iptv_channels WHERE playlistId = :playlistId")
     suspend fun getChannelCount(playlistId: Long): Int
+
+    @Query("SELECT * FROM iptv_channels WHERE uniqueId IN (:ids)")
+    suspend fun getChannelsByUniqueIds(ids: List<String>): List<IptvChannel>
+
+    @Query("SELECT * FROM iptv_channels WHERE uniqueId IN (:ids)")
+    fun getChannelsByUniqueIdsFlow(ids: List<String>): Flow<List<IptvChannel>>
 }

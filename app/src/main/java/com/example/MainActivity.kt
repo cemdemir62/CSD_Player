@@ -20,6 +20,7 @@ import com.example.ui.screens.LoginScreen
 import com.example.ui.screens.PlayerScreen
 import androidx.compose.foundation.layout.Box
 import com.example.ui.screens.WelcomeScreen
+import com.example.ui.screens.ProfileSelectionScreen
 import com.example.ui.screens.SplashScreen
 import com.example.ui.screens.SeriesDetailOverlay
 import com.example.data.model.IptvChannel
@@ -38,6 +39,7 @@ class MainActivity : ComponentActivity() {
                 
                 // Gözlemlenen reactive durumlar (flows)
                 val appMode by viewModel.appMode.collectAsState()
+                val selectedProfile by viewModel.selectedProfile.collectAsState()
                 var isSplashActive by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
 
                 // Dynamic Orientation Management:
@@ -61,6 +63,8 @@ class MainActivity : ComponentActivity() {
                 val activeSeriesChannel by viewModel.activeSeriesChannel.collectAsState()
                 val seriesSeasons by viewModel.seriesSeasons.collectAsState()
                 val seriesEpisodes by viewModel.seriesEpisodes.collectAsState()
+                val continueWatchingList by viewModel.continueWatchingChannels.collectAsState()
+                val continueWatchingData by viewModel.continueWatchingData.collectAsState()
 
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     // Android sistem çubuğu (Edge-to-Edge) insets padding değerlerini alarak,
@@ -80,6 +84,20 @@ class MainActivity : ComponentActivity() {
                                 onModeSelected = { mode ->
                                     viewModel.setAppMode(mode)
                                 }
+                            )
+                        }
+
+                        // 1.1 Durum: Netflix Tarzı Çoklu Profil Seçim Ekranı
+                        selectedProfile == null -> {
+                            val profiles by viewModel.profiles.collectAsState()
+                            ProfileSelectionScreen(
+                                profiles = profiles,
+                                onProfileSelected = { p -> viewModel.selectProfile(p) },
+                                onAddProfile = { name, color, emoji, isKids ->
+                                    viewModel.addProfile(name, color, emoji, isKids)
+                                },
+                                onDeleteProfile = { p -> viewModel.deleteProfile(p) },
+                                isTvMode = isTv
                             )
                         }
 
@@ -207,6 +225,13 @@ class MainActivity : ComponentActivity() {
                                     selectedGroup = selectedGroup,
                                     searchQuery = searchQuery,
                                     isTvMode = isTv,
+                                    selectedProfile = selectedProfile!!,
+                                    onSwitchProfile = { viewModel.selectProfile(null) },
+                                    continueWatchingList = continueWatchingList,
+                                    continueWatchingProgress = continueWatchingData,
+                                    onRemoveContinueWatching = { channel ->
+                                        viewModel.removeFromContinueWatching(channel.uniqueId)
+                                    },
                                     onTypeSelected = { type ->
                                         viewModel.selectType(type)
                                     },
