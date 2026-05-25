@@ -19,6 +19,8 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -28,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.IptvChannel
 import com.example.data.model.Playlist
 import com.example.ui.theme.NetflixDarkGrey
@@ -115,55 +118,81 @@ fun SettingsDialog(
     val movieCount = remember(channels) { channels.count { it.type == "MOVIE" } }
     val seriesCount = remember(channels) { channels.count { it.type == "SERIES" } }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0C0C0C)),
-            border = BorderStroke(2.dp, NetflixRed.copy(alpha = 0.85f)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF08080B)),
+            border = BorderStroke(1.5.dp, NetflixRed.copy(alpha = 0.6f)),
             shape = RoundedCornerShape(24.dp),
             modifier = Modifier
-                .fillMaxWidth(if (isTvMode) 0.82f else 0.95f)
-                .fillMaxHeight(if (isTvMode) 0.85f else 0.90f)
-                .padding(8.dp)
+                .fillMaxWidth(if (isTvMode) 0.86f else 0.95f)
+                .fillMaxHeight(if (isTvMode) 0.88f else 0.92f)
+                .padding(6.dp)
                 .testTag("app_settings_dialog")
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(20.dp)
+                    .padding(24.dp)
             ) {
-                // Settings Header
+                // Settings Header Redesigned as a Premium Title & Live Status Area
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 18.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
-                            shape = CircleShape,
-                            color = NetflixRed.copy(alpha = 0.15f),
-                            modifier = Modifier.size(40.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            color = NetflixRed.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, NetflixRed.copy(alpha = 0.35f)),
+                            modifier = Modifier.size(46.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.Settings,
                                     contentDescription = null,
                                     tint = NetflixRed,
-                                    modifier = Modifier.size(22.dp)
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(16.dp))
                         Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "ZULA KONTROL MERKEZİ",
+                                    color = Color.White,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 1.sp
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                // Elegant Badge
+                                Surface(
+                                    color = Color(0xFFE50914).copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(6.dp),
+                                    border = BorderStroke(1.dp, Color(0xFFE50914).copy(alpha = 0.4f))
+                                ) {
+                                    Text(
+                                        text = "PANEL",
+                                        color = Color(0xFFFF5252),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Uygulama & Yayın Ayarları",
-                                color = Color.White,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Aktif Paket: ${playlist.name}",
+                                text = "Mevcut Paket: ${playlist.name}",
                                 color = Color.Gray,
-                                fontSize = 11.sp
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
@@ -172,19 +201,20 @@ fun SettingsDialog(
                     IconButton(
                         onClick = onDismiss,
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(38.dp)
+                            .background(Color(0xFF18181F), CircleShape)
+                            .border(1.dp, Color(0xFF2D2D35), CircleShape)
                             .focusRequester(dismissFocusRequester)
                             .testTag("action_dismiss_settings")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Kapat",
-                            tint = Color.LightGray
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
 
                 // Layout divided into left tabs sidebar/panel and right side layout details on TV Mode
                 if (isTvMode) {
@@ -192,23 +222,25 @@ fun SettingsDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        horizontalArrangement = Arrangement.spacedBy(20.dp)
                     ) {
                         // Left Tab list for TV screen
                         Column(
                             modifier = Modifier
-                                .width(220.dp)
+                                .width(230.dp)
                                 .fillMaxHeight()
-                                .background(Color(0xFF141414), RoundedCornerShape(12.dp))
-                                .padding(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                .background(Color(0xFF101015), RoundedCornerShape(16.dp))
+                                .border(1.dp, Color(0xFF1E1E26), RoundedCornerShape(16.dp))
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Text(
                                 text = "KATEGORİLER",
                                 fontSize = 10.sp,
                                 color = Color.Gray,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 1.5.sp,
+                                modifier = Modifier.padding(start = 12.dp, top = 6.dp, bottom = 6.dp)
                             )
 
                             TvSettingsTabButton(
@@ -249,8 +281,9 @@ fun SettingsDialog(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .background(Color(0xFF111111), RoundedCornerShape(12.dp))
-                                .padding(16.dp)
+                                .background(Color(0xFF101015), RoundedCornerShape(16.dp))
+                                .border(1.dp, Color(0xFF1E1E26), RoundedCornerShape(16.dp))
+                                .padding(20.dp)
                         ) {
                             SettingsPanelContent(
                                 tab = activeTab,
@@ -290,8 +323,8 @@ fun SettingsDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState())
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                .padding(vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             MobileSettingsTabButton(
                                 label = "Abonelik",
@@ -312,21 +345,22 @@ fun SettingsDialog(
                                 onClick = { activeTab = 2 }
                             )
                             MobileSettingsTabButton(
-                                label = "Sistem/Cihaz",
+                                label = "Sistem & Cihaz",
                                 icon = Icons.Default.Info,
                                 isSelected = activeTab == 3,
                                 onClick = { activeTab = 3 }
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
-                                .background(Color(0xFF141414), RoundedCornerShape(16.dp))
-                                .padding(14.dp)
+                                .background(Color(0xFF101015), RoundedCornerShape(20.dp))
+                                .border(1.dp, Color(0xFF1E1E26), RoundedCornerShape(20.dp))
+                                .padding(18.dp)
                         ) {
                             SettingsPanelContent(
                                 tab = activeTab,
@@ -390,64 +424,103 @@ fun SettingsPanelContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Subscription active card header
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFF1E1E1E), RoundedCornerShape(10.dp))
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Subscription active gradient card header
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, Color(0xFF2E7D32).copy(alpha = 0.6f)),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Box(
+                    Row(
                         modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF4CAF50))
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "ABONELİK DURUMU: AKTİF",
-                        color = Color(0xFF4CAF50),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                    Text(
-                        text = "$daysRemaining Gün Kaldı",
-                        color = Color.LightGray,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                            .background(Brush.horizontalGradient(listOf(Color(0xFF0F2617), Color(0xFF0C1D12))))
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(Color(0xFF4CAF50), CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "ABONELİK DURUMU: AKTİF",
+                            color = Color(0xFF81C784),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        Text(
+                            text = "$daysRemaining Gün Kaldı",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
-                // Split metrics
+                // Split metrics redesigned as Beautiful Grid-breaking Cards
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    MetricBox(modifier = Modifier.weight(1f), title = "Canlı TV", count = "$liveCount", icon = Icons.Default.Tv, tint = Color(0xFF2196F3))
-                    MetricBox(modifier = Modifier.weight(1f), title = "Filmler", count = "$movieCount", icon = Icons.Default.Movie, tint = Color(0xFFE91E63))
-                    MetricBox(modifier = Modifier.weight(1f), title = "Diziler", count = "$seriesCount", icon = Icons.Default.VideoLibrary, tint = Color(0xFFFF9800))
+                    MetricBox(
+                        modifier = Modifier.weight(1f),
+                        title = "Canlı TV",
+                        count = "$liveCount",
+                        icon = Icons.Default.Tv,
+                        tint = Color(0xFF2196F3)
+                    )
+                    MetricBox(
+                        modifier = Modifier.weight(1f),
+                        title = "Filmler",
+                        count = "$movieCount",
+                        icon = Icons.Default.Movie,
+                        tint = Color(0xFFE91E63)
+                    )
+                    MetricBox(
+                        modifier = Modifier.weight(1f),
+                        title = "Diziler",
+                        count = "$seriesCount",
+                        icon = Icons.Default.VideoLibrary,
+                        tint = Color(0xFFFF9800)
+                    )
                 }
 
-                // Info entries
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFF141414), RoundedCornerShape(10.dp))
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                // Info entries structured within an advanced Glass Card
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF13131A)),
+                    border = BorderStroke(1.dp, Color(0xFF1E1E26)),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    InfoRow("Paket İsmi", playlist.name)
-                    InfoRow("Bağlantı Türü", playlist.type)
-                    if (playlist.type == "XTREAM") {
-                        InfoRow("Kullanıcı Adı", playlist.username ?: "Bilinmiyor")
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "BAĞLANTI VE SUNUCU DETAYLARI",
+                            color = Color.Gray,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                        InfoRow("Paket İsmi", playlist.name)
+                        HorizontalDivider(color = Color(0xFF1E1E26), thickness = 1.dp)
+                        InfoRow("Bağlantı Türü", playlist.type)
+                        if (playlist.type == "XTREAM") {
+                            HorizontalDivider(color = Color(0xFF1E1E26), thickness = 1.dp)
+                            InfoRow("Kullanıcı Adı", playlist.username ?: "Bilinmiyor")
+                        }
+                        HorizontalDivider(color = Color(0xFF1E1E26), thickness = 1.dp)
+                        InfoRow("Sunucu Hostu", serverHost)
+                        HorizontalDivider(color = Color(0xFF1E1E26), thickness = 1.dp)
+                        InfoRow("Oluşturulma Tarihi", creationFormatted)
+                        HorizontalDivider(color = Color(0xFF1E1E26), thickness = 1.dp)
+                        InfoRow("Bitiş/Yenileme Tarihi", expirationFormatted)
                     }
-                    InfoRow("Sunucu Hostu", serverHost)
-                    InfoRow("Oluşturulma Tarihi", creationFormatted)
-                    InfoRow("Bitiş/Yenileme Tarihi", expirationFormatted)
                 }
             }
         }
@@ -457,19 +530,20 @@ fun SettingsPanelContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "Oynatıcı ve Zap-Lock Gelişmiş Ayarlar",
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "YAYIN MOTORU YAPILANDIRMASI",
+                    color = Color.Gray,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
                 )
 
                 // Low Latency Mode Row
                 SettingsToggleRow(
                     title = "ExoPlayer Düşük Gecikme Modu",
-                    subtitle = "Canlı (Live TV) yayınlarında ağ gecikmesini optimize ederek en yakın canlı yayını yakalar.",
+                    subtitle = "Canlı yayınlarda ağ tampon süresini optimize ederek en yakın akışı yakalar.",
                     checked = lowLatencyMode,
                     isTvMode = isTvMode,
                     onCheckedChange = onLowLatencyChanged
@@ -477,235 +551,298 @@ fun SettingsPanelContent(
 
                 // Zap Category lock Row
                 SettingsToggleRow(
-                    title = "Akıllı Kategori İçi Zap Kilidi",
-                    subtitle = "D-Pad Yukarı/Aşağı tuşları ile kanal değiştirirken (Zapping) mevcut kategori sınırları dışına çıkmayı engeller.",
+                    title = "Kategori İçi Zap Kilidi (D-Pad)",
+                    subtitle = "Kanal zapping işlemi sırasında yanlışlıkla farklı kategoriye geçmeyi engeller.",
                     checked = zapLockCategory,
                     isTvMode = isTvMode,
                     onCheckedChange = onZapLockChanged
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Mode reset action trigger (TV Mode <-> Mobile Mode switcher UI)
-                val isSwitchedToTv = !isTvMode
-                val switchInteraction = remember { MutableInteractionSource() }
-                Button(
-                    onClick = onResetMode,
-                    colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
-                    shape = RoundedCornerShape(8.dp),
-                    interactionSource = switchInteraction,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusable(interactionSource = switchInteraction)
-                        .tvFocusBorder(isTvMode = isTvMode, interactionSource = switchInteraction)
+                // Split Mode Switcher in dynamic Container card
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF13131A)),
+                    border = BorderStroke(1.dp, Color(0xFF1E1E26)),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = if (isTvMode) Icons.Default.PhoneAndroid else Icons.Default.Tv,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = if (isTvMode) "Dokunmatik Mobil Moduna Geç" else "Televizyon (TV Box D-Pad) Moduna Geç",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
+                            text = "VARSAYILAN KONTROL MODU",
+                            color = Color.Gray,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
                         )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Arayüz şemasını cihazınıza göre ayarlayın. D-Pad TV modu uzaktan kumandayla yön tuşlarını odaklar, Mobil mod dokunma hareketlerine duyarlıdır.",
+                            color = Color.LightGray,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        val switchInteraction = remember { MutableInteractionSource() }
+                        Button(
+                            onClick = onResetMode,
+                            colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
+                            shape = RoundedCornerShape(10.dp),
+                            interactionSource = switchInteraction,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(42.dp)
+                                .focusable(interactionSource = switchInteraction)
+                                .tvFocusBorder(isTvMode = isTvMode, interactionSource = switchInteraction, shape = RoundedCornerShape(10.dp))
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isTvMode) Icons.Default.PhoneAndroid else Icons.Default.Tv,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                val labelText = if (isTvMode) "Mobil Dokunmatik Moduna Geç" else "Televizyon (D-Pad) Moduna Geç"
+                                Text(
+                                    text = labelText,
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
         2 -> {
-            // MAINTENANCE & MAINTENANCE PANEL
+            // MAINTENANCE PANEL
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "Önbellek Temizleme ve IPTV Veritabanı Güncelleme",
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text = "Aşağıdaki araçları kullanarak yayınları yeniden yükleyebilir, izleme geçmişini temizleyebilir ve uygulama performansını optimize edebilirsiniz.",
+                    text = "SİSTEM VE BELLEK OPTİMİZASYONU",
                     color = Color.Gray,
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
                 )
 
-                // Clear continue watching history
-                val clearRecentInteraction = remember { MutableInteractionSource() }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFF141414), RoundedCornerShape(10.dp))
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                // Clear watch history Card Container
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF13131A)),
+                    border = BorderStroke(1.dp, Color(0xFF1E1E26)),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Kaldığın Yerden Devam Et Verilerini Sıfırla",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Yarıda bıraktığınız dizi bölümleri ve filmlerin izleme sürelerini temizler.",
-                            color = Color.Gray,
-                            fontSize = 10.sp
-                        )
-                    }
-                    Button(
-                        onClick = {
-                            val prefs = context.getSharedPreferences("zula_iptv_prefs", android.content.Context.MODE_PRIVATE)
-                            val editor = prefs.edit()
-                            prefs.all.keys.filter { it.startsWith("resume_pos_") || it.startsWith("series_") }.forEach {
-                                editor.remove(it)
-                            }
-                            editor.apply()
-                            Toast.makeText(context, "Kaldığın yerden devam et geçmişi sıfırlandı!", Toast.LENGTH_SHORT).show()
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF222222)),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                        shape = RoundedCornerShape(6.dp),
-                        interactionSource = clearRecentInteraction,
-                        modifier = Modifier
-                            .height(36.dp)
-                            .focusable(interactionSource = clearRecentInteraction)
-                            .tvFocusBorder(isTvMode = isTvMode, interactionSource = clearRecentInteraction)
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Temizle", color = Color.White, fontSize = 11.sp)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Kaldığın Yerden Devam Et Geçmişi",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Yarıda bıraktığınız dizi ve film izleme kayıtlarını cihazınızdan tamamen siler.",
+                                color = Color.Gray,
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        
+                        val clearRecentInteraction = remember { MutableInteractionSource() }
+                        Button(
+                            onClick = {
+                                val prefs = context.getSharedPreferences("zula_iptv_prefs", android.content.Context.MODE_PRIVATE)
+                                val editor = prefs.edit()
+                                prefs.all.keys.filter { it.startsWith("resume_pos_") || it.startsWith("series_") }.forEach {
+                                    editor.remove(it)
+                                }
+                                editor.apply()
+                                Toast.makeText(context, "Kaldığın yerden devam et geçmişi sıfırlandı!", Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1F1F27)),
+                            border = BorderStroke(1.dp, Color(0xFF32323D)),
+                            shape = RoundedCornerShape(8.dp),
+                            interactionSource = clearRecentInteraction,
+                            modifier = Modifier
+                                .focusable(interactionSource = clearRecentInteraction)
+                                .tvFocusBorder(isTvMode = isTvMode, interactionSource = clearRecentInteraction, shape = RoundedCornerShape(8.dp))
+                        ) {
+                            Text("Temizle", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
 
-                // Force refresh Playlist details from IPTV api
-                val forceRefreshInteraction = remember { MutableInteractionSource() }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFF141414), RoundedCornerShape(10.dp))
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                // Force refresh Playlist details from IPTV Server
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF13131A)),
+                    border = BorderStroke(1.dp, Color(0xFF1E1E26)),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "IPTV Listesini Çevrimiçi Yeniden Çek",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Yayın listenizde eksik kanallar varsa, IPTV listesini sunucudan sıfırdan indirir.",
-                            color = Color.Gray,
-                            fontSize = 10.sp
-                        )
-                    }
-                    Button(
-                        onClick = {
-                            onRefreshPlaylist()
-                            Toast.makeText(context, "IPTV oynatma listesi güncellemesi tetiklendi!", Toast.LENGTH_SHORT).show()
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                        shape = RoundedCornerShape(6.dp),
-                        interactionSource = forceRefreshInteraction,
-                        modifier = Modifier
-                            .height(36.dp)
-                            .focusable(interactionSource = forceRefreshInteraction)
-                            .tvFocusBorder(isTvMode = isTvMode, interactionSource = forceRefreshInteraction)
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Refresh, null, tint = Color.White, modifier = Modifier.size(12.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Şimdi Güncelle", color = Color.White, fontSize = 11.sp)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Oynatma Listesini Güncelle",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Eksik kanalları gidermek amacıyla sunucu veritabanını sıfırdan indirir.",
+                                color = Color.Gray,
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        val forceRefreshInteraction = remember { MutableInteractionSource() }
+                        Button(
+                            onClick = {
+                                onRefreshPlaylist()
+                                Toast.makeText(context, "IPTV oynatma listesi güncellemesi tetiklendi!", Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
+                            shape = RoundedCornerShape(8.dp),
+                            interactionSource = forceRefreshInteraction,
+                            modifier = Modifier
+                                .focusable(interactionSource = forceRefreshInteraction)
+                                .tvFocusBorder(isTvMode = isTvMode, interactionSource = forceRefreshInteraction, shape = RoundedCornerShape(8.dp))
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Refresh, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Yenile", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
             }
         }
         3 -> {
-            // DIAGNOSTICS & SYSTEM INFO PANEL
+            // SYSTEM INFO & SPEED TEST PANEL
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "Teşhis Bilgileri ve Hız Testi Aracı",
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "SİSTEM TEŞHİSİ VE ANALİZİ",
+                    color = Color.Gray,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
                 )
 
-                // Launch speed test block
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(NetflixRed.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
-                        .border(1.dp, NetflixRed.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Launch speed test block redesigned with beautiful gradient overlay
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, NetflixRed.copy(alpha = 0.45f)),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Gelişmiş İnternet Hız Ölçeri",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Mevcut bant genişliğinizi ölçüp hangi IPTV yayın kalitesini desteklediğinizi analiz edin.",
-                            color = Color.LightGray,
-                            fontSize = 10.sp,
-                            lineHeight = 13.sp
-                        )
-                    }
-
-                    val runSpeedInteraction = remember { MutableInteractionSource() }
-                    Button(
-                        onClick = onLaunchSpeedTest,
-                        colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
-                        shape = RoundedCornerShape(6.dp),
-                        interactionSource = runSpeedInteraction,
+                    Row(
                         modifier = Modifier
-                            .height(36.dp)
-                            .focusable(interactionSource = runSpeedInteraction)
-                            .tvFocusBorder(isTvMode = isTvMode, interactionSource = runSpeedInteraction)
+                            .background(Brush.horizontalGradient(colors = listOf(Color(0xFF220C0E), Color(0xFF0C0C10))))
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Speed, null, tint = Color.White, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Hız Ölçer", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = NetflixRed.copy(alpha = 0.15f),
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Speed,
+                                    contentDescription = null,
+                                    tint = NetflixRed,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Gelişmiş Ağ Hız Ölçer",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Yayın akışı öncesinde donmaları engellemek amacıyla bant genişliğini ve pingi eşzamanlı test eder.",
+                                color = Color.LightGray,
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        val runSpeedInteraction = remember { MutableInteractionSource() }
+                        Button(
+                            onClick = onLaunchSpeedTest,
+                            colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
+                            shape = RoundedCornerShape(8.dp),
+                            interactionSource = runSpeedInteraction,
+                            modifier = Modifier
+                                .focusable(interactionSource = runSpeedInteraction)
+                                .tvFocusBorder(isTvMode = isTvMode, interactionSource = runSpeedInteraction, shape = RoundedCornerShape(8.dp))
+                        ) {
+                            Text("Hız Testi", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
 
-                // Specs list
+                // Specs list restructured
                 val buildModel = android.os.Build.MODEL
                 val buildVersion = android.os.Build.VERSION.RELEASE
                 val buildSdk = android.os.Build.VERSION.SDK_INT
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFF141414), RoundedCornerShape(10.dp))
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF13131A)),
+                    border = BorderStroke(1.dp, Color(0xFF1E1E26)),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    InfoRow("Cihaz Modeli", buildModel)
-                    InfoRow("Android Versiyonu", "Android $buildVersion (API $buildSdk)")
-                    InfoRow("Uygulama Sürümü", "v2.8.5 Premium TV")
-                    InfoRow("Yürütme Altyapısı", "Google ExoPlayer Media3")
-                    InfoRow("Sürüm Derlemesi", "3ea53d0-2659-4394")
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "DONANIM VE LİSANS BİLGİLERİ",
+                            color = Color.Gray,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                        InfoRow("Cihaz Modeli", buildModel)
+                        HorizontalDivider(color = Color(0xFF1E1E26), thickness = 1.dp)
+                        InfoRow("Android Versiyonu", "Android $buildVersion (API $buildSdk)")
+                        HorizontalDivider(color = Color(0xFF1E1E26), thickness = 1.dp)
+                        InfoRow("Uygulama Sürümü", "v2.8.5 Premium TV")
+                        HorizontalDivider(color = Color(0xFF1E1E26), thickness = 1.dp)
+                        InfoRow("Yürütme Altyapısı", "Google ExoPlayer Media3")
+                        HorizontalDivider(color = Color(0xFF1E1E26), thickness = 1.dp)
+                        InfoRow("Sürüm Derlemesi", "3ea53d0-2659-4394")
+                    }
                 }
             }
         }
@@ -715,7 +852,9 @@ fun SettingsPanelContent(
 @Composable
 fun InfoRow(label: String, value: String) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 11.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -742,36 +881,49 @@ fun MetricBox(
     modifier: Modifier = Modifier,
     title: String,
     count: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     tint: Color
 ) {
     Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = Color(0xFF141414),
+        shape = RoundedCornerShape(14.dp),
+        color = Color(0xFF13131A),
+        border = BorderStroke(1.dp, tint.copy(alpha = 0.25f)),
         modifier = modifier
     ) {
-        Column(
-            modifier = Modifier.padding(10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = tint,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = count,
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
-            Text(
-                text = title,
-                color = Color.Gray,
-                fontSize = 9.sp
-            )
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = tint.copy(alpha = 0.12f),
+                modifier = Modifier.size(36.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = tint,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+                Text(
+                    text = count,
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Text(
+                    text = title,
+                    color = Color.Gray,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }
@@ -789,16 +941,17 @@ fun SettingsToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF141414))
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0xFF13131A))
+            .border(1.dp, Color(0xFF1E1E26), RoundedCornerShape(14.dp))
             .clickable(
                 interactionSource = interactionSource,
                 indication = androidx.compose.foundation.LocalIndication.current,
                 onClick = { onCheckedChange(!checked) }
             )
             .focusable(interactionSource = interactionSource)
-            .tvFocusBorder(isTvMode = isTvMode, interactionSource = interactionSource)
-            .padding(12.dp),
+            .tvFocusBorder(isTvMode = isTvMode, interactionSource = interactionSource, shape = RoundedCornerShape(14.dp))
+            .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -806,14 +959,15 @@ fun SettingsToggleRow(
             Text(
                 text = title,
                 color = Color.White,
-                fontSize = 12.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Bold
             )
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = subtitle,
                 color = Color.Gray,
-                fontSize = 10.sp,
-                lineHeight = 13.sp
+                fontSize = 11.sp,
+                lineHeight = 15.sp
             )
         }
         Spacer(modifier = Modifier.width(16.dp))
@@ -834,7 +988,7 @@ fun SettingsToggleRow(
 @Composable
 fun TvSettingsTabButton(
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     isSelected: Boolean,
     isTvMode: Boolean,
     onClick: () -> Unit
@@ -842,8 +996,9 @@ fun TvSettingsTabButton(
     val interactionSource = remember { MutableInteractionSource() }
 
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(12.dp),
         color = if (isSelected) NetflixRed else Color.Transparent,
+        border = if (isSelected) BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)) else null,
         modifier = Modifier
             .fillMaxWidth()
             .clickable(
@@ -852,23 +1007,23 @@ fun TvSettingsTabButton(
                 onClick = onClick
             )
             .focusable(interactionSource = interactionSource)
-            .tvFocusBorder(isTvMode = isTvMode, interactionSource = interactionSource)
+            .tvFocusBorder(isTvMode = isTvMode, interactionSource = interactionSource, shape = RoundedCornerShape(12.dp))
     ) {
         Row(
-            modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
+            modifier = Modifier.padding(vertical = 11.dp, horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = if (isSelected) Color.White else Color.LightGray,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(17.dp)
             )
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = label,
                 color = if (isSelected) Color.White else Color.LightGray,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
             )
         }
@@ -878,15 +1033,16 @@ fun TvSettingsTabButton(
 @Composable
 fun MobileSettingsTabButton(
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
     Surface(
         shape = RoundedCornerShape(20.dp),
-        color = if (isSelected) NetflixRed else Color(0xFF1E1E1E),
+        color = if (isSelected) NetflixRed else Color(0xFF13131A),
+        border = BorderStroke(1.dp, if (isSelected) NetflixRed.copy(alpha = 0.5f) else Color(0xFF1E1E26)),
         modifier = Modifier
-            .height(36.dp)
+            .height(38.dp)
             .clickable { onClick() }
     ) {
         Row(
@@ -897,9 +1053,9 @@ fun MobileSettingsTabButton(
                 imageVector = icon,
                 contentDescription = null,
                 tint = if (isSelected) Color.White else Color.Gray,
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier.size(15.dp)
             )
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = label,
                 color = if (isSelected) Color.White else Color.LightGray,
