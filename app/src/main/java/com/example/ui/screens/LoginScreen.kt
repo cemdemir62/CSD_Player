@@ -76,21 +76,26 @@ fun LoginScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(28.dp)
-                                .background(NetflixRed, RoundedCornerShape(4.dp)),
+                                .size(30.dp)
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(NetflixRed, Color(0xFFFF3B44))
+                                    ), 
+                                    RoundedCornerShape(6.dp)
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "CSD",
                                 color = Color.White,
                                 fontWeight = FontWeight.Black,
-                                fontSize = 10.sp
+                                fontSize = 11.sp
                             )
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = "CSD PLAYER",
-                            color = NetflixRed,
+                            color = Color.White,
                             fontWeight = FontWeight.Black,
                             fontSize = 22.sp,
                             letterSpacing = (-1).sp
@@ -98,7 +103,7 @@ fun LoginScreen(
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color(0xFF0A0A0A)
+                    containerColor = Color(0xFF0D0D10)
                 )
             )
         }
@@ -109,13 +114,28 @@ fun LoginScreen(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xFF141414),
-                            Color(0xFF0A0A0A)
+                            Color(0xFF151518),
+                            Color(0xFF080809)
                         )
                     )
                 )
                 .padding(innerPadding)
         ) {
+            // Elegant top-right subtle background light
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(350.dp)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                NetflixRed.copy(alpha = 0.08f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
             if (useWideLayout) {
                 // TV MODE / LANDSCAPE TAB / WIDE SCREEN: Elegant Row side-by-side layout
                 Row(
@@ -318,29 +338,50 @@ fun LoginScreen(
 
 @Composable
 fun SavedPlaylistsPlaceholder() {
-    Box(
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF131316)),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
         modifier = Modifier
             .fillMaxWidth()
-            .height(200.dp)
-            .background(NetflixDarkGrey, RoundedCornerShape(12.dp))
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
+            .height(220.dp)
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                imageVector = Icons.Default.CloudQueue,
-                contentDescription = null,
-                tint = Color.DarkGray,
-                modifier = Modifier.size(56.dp)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Henüz kayıtlı liste yok.\nM3U veya Xtream bilgilerinizi girip hemen yükleyin.",
-                color = Color.Gray,
-                fontSize = 13.sp,
-                lineHeight = 18.sp,
-                textAlign = TextAlign.Center
-            )
+        Box(
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(26.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudQueue,
+                        contentDescription = null,
+                        tint = NetflixRed.copy(alpha = 0.8f),
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Henüz Oynatma Listesi Yok",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "M3U Linki veya Xtream bilgilerinizi sağ taraftaki formdan girerek canlı / video kütüphanenizi hemen yükleyebilirsiniz.",
+                    color = Color.Gray,
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(0.85f)
+                )
+            }
         }
     }
 }
@@ -354,13 +395,13 @@ fun PlaylistCard(
 ) {
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = NetflixDarkGrey
+            containerColor = Color(0xFF1D1D21)
         ),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
-        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .tvClickable(isTvMode = isTvMode) {
+            .tvClickable(isTvMode = isTvMode, shape = RoundedCornerShape(12.dp)) {
                 onPlaylistSelected(playlist)
             }
             .testTag("playlist_item_${playlist.id}")
@@ -368,7 +409,7 @@ fun PlaylistCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -376,13 +417,20 @@ fun PlaylistCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                Icon(
-                    imageVector = if (playlist.type == "XTREAM") Icons.Default.AccountCircle else Icons.Default.Link,
-                    contentDescription = null,
-                    tint = NetflixRed,
-                    modifier = Modifier.size(28.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .background(NetflixRed.copy(alpha = 0.1f), RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (playlist.type == "XTREAM") Icons.Default.AccountCircle else Icons.Default.Link,
+                        contentDescription = null,
+                        tint = NetflixRed,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(14.dp))
                 Column {
                     Text(
                         text = playlist.name,
@@ -392,8 +440,9 @@ fun PlaylistCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = if (playlist.type == "XTREAM") "Xtream Codes API" else "M3U Çalma Listesi",
+                        text = if (playlist.type == "XTREAM") "Xtream Codes API • Premium Bulut" else "M3U Linki • Ağ Kanal Listesi",
                         color = Color.Gray,
                         fontSize = 11.sp
                     )
@@ -406,7 +455,8 @@ fun PlaylistCard(
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Sil",
-                    tint = Color.DarkGray
+                    tint = Color.Gray.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
@@ -429,16 +479,16 @@ fun AddPlaylistForm(
     refreshState: RefreshState,
     onAddPlaylist: (String, String, String, String?, String?) -> Unit
 ) {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = NetflixDarkGrey,
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1D1D21)),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Name Field
@@ -598,18 +648,18 @@ fun AddPlaylistForm(
                 enabled = isFormValid && refreshState !is RefreshState.Loading,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = NetflixRed,
-                    disabledContainerColor = Color.DarkGray,
+                    disabledContainerColor = Color(0xFF28282B),
                     contentColor = Color.White,
-                    disabledContentColor = Color.Gray
+                    disabledContentColor = Color.Gray.copy(alpha = 0.5f)
                 ),
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(52.dp)
                     .tvFocusBorder(
                         isTvMode = isTvMode,
                         interactionSource = saveInteractionSource,
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(12.dp)
                     )
                     .testTag("save_playlist_button")
             ) {

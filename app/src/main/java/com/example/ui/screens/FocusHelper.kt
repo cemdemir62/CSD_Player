@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -11,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
@@ -27,11 +30,19 @@ fun Modifier.tvFocusBorder(
 ): Modifier {
     if (!isTvMode) return this
     val isFocused by interactionSource.collectIsFocusedAsState()
-    return if (isFocused) {
-        this.border(width = borderWidth, color = borderColor, shape = shape)
-    } else {
-        this
-    }
+    val animatedScale by animateFloatAsState(
+        targetValue = if (isFocused) 1.05f else 1.0f,
+        animationSpec = tween(durationMillis = 200),
+        label = "tv_focus_scale"
+    )
+    val animatedBorderColor by animateColorAsState(
+        targetValue = if (isFocused) borderColor else Color.Transparent,
+        animationSpec = tween(durationMillis = 200),
+        label = "tv_focus_border"
+    )
+    return this
+        .scale(animatedScale)
+        .border(width = borderWidth, color = animatedBorderColor, shape = shape)
 }
 
 @Composable
@@ -43,6 +54,19 @@ fun Modifier.tvClickable(
     onClick: () -> Unit
 ): Modifier {
     val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    
+    val animatedScale by animateFloatAsState(
+        targetValue = if (isFocused && isTvMode) 1.05f else 1.0f,
+        animationSpec = tween(durationMillis = 200),
+        label = "tv_clickable_scale"
+    )
+    val animatedBorderColor by animateColorAsState(
+        targetValue = if (isFocused && isTvMode) borderColor else Color.Transparent,
+        animationSpec = tween(durationMillis = 200),
+        label = "tv_clickable_border"
+    )
+
     val base = this
         .clickable(
             interactionSource = interactionSource,
@@ -50,14 +74,12 @@ fun Modifier.tvClickable(
             onClick = onClick
         )
     return if (isTvMode) {
-        val isFocused by interactionSource.collectIsFocusedAsState()
-        val focusableModifier = base.focusable(interactionSource = interactionSource)
-        if (isFocused) {
-            focusableModifier.border(width = borderWidth, color = borderColor, shape = shape)
-        } else {
-            focusableModifier
-        }
+        base
+            .focusable(interactionSource = interactionSource)
+            .scale(animatedScale)
+            .border(width = borderWidth, color = animatedBorderColor, shape = shape)
     } else {
         base
     }
 }
+

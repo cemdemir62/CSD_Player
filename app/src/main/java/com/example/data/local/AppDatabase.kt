@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import com.example.data.model.IptvChannel
 import com.example.data.model.Playlist
 
-@Database(entities = [Playlist::class, IptvChannel::class], version = 2, exportSchema = false)
+@Database(entities = [Playlist::class, IptvChannel::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun iptvDao(): IptvDao
 

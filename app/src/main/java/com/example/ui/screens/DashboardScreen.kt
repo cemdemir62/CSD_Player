@@ -15,6 +15,9 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
@@ -121,6 +124,7 @@ fun MobileDashboard(
 ) {
     var showSpeedTestDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var showVoiceSearch by remember { mutableStateOf(false) }
     val visibleLimit = remember(selectedType, selectedGroup, searchQuery) { mutableStateOf(80) }
     val displayedChannels = remember(channels, visibleLimit.value) {
         channels.take(visibleLimit.value)
@@ -137,8 +141,19 @@ fun MobileDashboard(
             visibleLimit.value += 80
         }
     }
-    val channelsByGroup = remember(channels) {
-        channels.groupBy { it.groupTitle ?: "" }
+    val channelsByGroup = remember(channels, groups) {
+        val targetGroups = groups.take(8).toSet()
+        val result = mutableMapOf<String, MutableList<IptvChannel>>()
+        for (channel in channels) {
+            val group = channel.groupTitle ?: ""
+            if (targetGroups.contains(group)) {
+                val list = result.getOrPut(group) { mutableListOf() }
+                if (list.size < 15) {
+                    list.add(channel)
+                }
+            }
+        }
+        result
     }
 
     // Mobil için varsayılan öne çıkan (Showcase / Spotlight) video
@@ -231,9 +246,17 @@ fun MobileDashboard(
                 placeholder = { Text("Kanal, film veya dizi ara...", fontSize = 12.sp, color = Color.Gray) },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.Gray, modifier = Modifier.size(18.dp)) },
                 trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { onSearchChanged("") }) {
-                            Icon(Icons.Default.Clear, null, tint = Color.LightGray, modifier = Modifier.size(16.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { onSearchChanged("") }) {
+                                Icon(Icons.Default.Clear, null, tint = Color.LightGray, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                        IconButton(onClick = { showVoiceSearch = true }) {
+                            Icon(Icons.Default.Mic, "Sesli Arama", tint = NetflixRed, modifier = Modifier.size(18.dp))
                         }
                     }
                 },
@@ -471,6 +494,14 @@ fun MobileDashboard(
             showSpeedTestDialog = true
         }
     )
+
+    if (showVoiceSearch) {
+        VoiceSearchDialog(
+            isTvMode = false,
+            onDismissRequest = { showVoiceSearch = false },
+            onResult = { onSearchChanged(it) }
+        )
+    }
 }
 
 // ==========================================
@@ -496,6 +527,7 @@ fun TvDashboard(
 ) {
     var showSpeedTestDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var showVoiceSearch by remember { mutableStateOf(false) }
     val visibleLimit = remember(selectedType, selectedGroup, searchQuery) { mutableStateOf(80) }
     val displayedChannels = remember(channels, visibleLimit.value) {
         channels.take(visibleLimit.value)
@@ -626,25 +658,59 @@ fun TvDashboard(
                 }
 
                 // TV Arama Çubuğu
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = onSearchChanged,
-                    placeholder = { Text("Kanal / film / dizi ara...", fontSize = 12.sp, color = Color.Gray) },
-                    leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.Gray, modifier = Modifier.size(18.dp)) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = NetflixRed,
-                        unfocusedBorderColor = Color.DarkGray,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedContainerColor = Color(0xFF222222),
-                        unfocusedContainerColor = Color(0xFF1B1B1B)
-                    ),
-                    modifier = Modifier
-                        .width(240.dp)
-                        .height(46.dp)
-                        .testTag("dashboard_search_input")
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchChanged,
+                        placeholder = { Text("Kanal / film / dizi ara...", fontSize = 12.sp, color = Color.Gray) },
+                        leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.Gray, modifier = Modifier.size(18.dp)) },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { onSearchChanged("") }) {
+                                    Icon(Icons.Default.Clear, null, tint = Color.LightGray, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NetflixRed,
+                            unfocusedBorderColor = Color.DarkGray,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedContainerColor = Color(0xFF222222),
+                            unfocusedContainerColor = Color(0xFF1B1B1B)
+                        ),
+                        modifier = Modifier
+                            .width(220.dp)
+                            .height(46.dp)
+                            .testTag("dashboard_search_input")
+                    )
+
+                    val tvMicInteraction = remember { MutableInteractionSource() }
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF222222))
+                            .focusable(interactionSource = tvMicInteraction)
+                            .tvFocusBorder(isTvMode = true, interactionSource = tvMicInteraction, shape = CircleShape)
+                            .tvClickable(isTvMode = true, shape = CircleShape) {
+                                showVoiceSearch = true
+                            }
+                            .testTag("tv_voice_search_button"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = "Sesli Arama",
+                            tint = NetflixRed,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
             }
 
             // TV İKİLİ PANEL (Sol Kategori D-Pad Çekmecesi, Sağ Yayın Gridi)
@@ -805,6 +871,14 @@ fun TvDashboard(
             showSpeedTestDialog = true
         }
     )
+
+    if (showVoiceSearch) {
+        VoiceSearchDialog(
+            isTvMode = true,
+            onDismissRequest = { showVoiceSearch = false },
+            onResult = { onSearchChanged(it) }
+        )
+    }
 }
 
 // ==========================================
@@ -1034,12 +1108,12 @@ fun ChannelGridCard(
     onToggleFav: () -> Unit
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF141414)),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
-        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E23)),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .tvClickable(isTvMode = isTvMode, shape = RoundedCornerShape(8.dp)) {
+            .tvClickable(isTvMode = isTvMode, shape = RoundedCornerShape(12.dp)) {
                 onClick()
             }
             .testTag("channel_card_${channel.uniqueId}")
@@ -1049,6 +1123,7 @@ fun ChannelGridCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(if (isLandscape) 1.58f else 0.72f)
+                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
                     .background(Color.Black)
             ) {
                 // Logo / Afiş Resmi
@@ -1069,7 +1144,16 @@ fun ChannelGridCard(
                     )
                 } else {
                     Box(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color(0xFF2D2D35),
+                                        Color(0xFF15151A)
+                                    )
+                                )
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
@@ -1079,13 +1163,13 @@ fun ChannelGridCard(
                             Icon(
                                 imageVector = if (channel.type == "LIVE") Icons.Default.Tv else Icons.Default.PlayCircle,
                                 contentDescription = null,
-                                tint = Color.DarkGray,
+                                tint = NetflixRed.copy(alpha = 0.8f),
                                 modifier = Modifier.size(24.dp)
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 text = channel.name.take(1).uppercase(),
-                                color = Color.Gray,
+                                color = Color.White,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Black
                             )
@@ -1107,13 +1191,13 @@ fun ChannelGridCard(
                 // Premium floating Favorite circle
                 Box(
                     modifier = Modifier
-                        .padding(4.dp)
+                        .padding(6.dp)
                         .align(Alignment.TopStart)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(26.dp)
-                            .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(13.dp))
+                            .size(28.dp)
+                            .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(14.dp))
                             .clickable { onToggleFav() },
                         contentAlignment = Alignment.Center
                     ) {
@@ -1121,7 +1205,7 @@ fun ChannelGridCard(
                             imageVector = if (channel.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = "Favori",
                             tint = if (channel.isFavorite) NetflixRed else Color.White,
-                            modifier = Modifier.size(13.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                     }
                 }
@@ -1129,7 +1213,7 @@ fun ChannelGridCard(
                 // Canlı TV simgesi
                 if (channel.type == "LIVE") {
                     Surface(
-                        shape = RoundedCornerShape(topEnd = 3.dp),
+                        shape = RoundedCornerShape(topEnd = 4.dp),
                         color = NetflixRed,
                         modifier = Modifier.align(Alignment.BottomStart)
                     ) {
@@ -1138,7 +1222,7 @@ fun ChannelGridCard(
                             color = Color.White,
                             fontSize = 7.sp,
                             fontWeight = FontWeight.Black,
-                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
                 }
@@ -1148,11 +1232,11 @@ fun ChannelGridCard(
             Text(
                 text = channel.name,
                 color = Color.White,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
             )
         }
     }
@@ -1160,24 +1244,52 @@ fun ChannelGridCard(
 
 @Composable
 fun EmptyState() {
-    Column(
+    Box(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+        contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = Icons.Default.FilterList,
-            contentDescription = null,
-            tint = Color.DarkGray,
-            modifier = Modifier.size(48.dp)
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = "Bu filtrede gösterilecek yayın bulunamadı.",
-            color = Color.Gray,
-            fontSize = 12.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 32.dp)
-        )
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF16161A)),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
+            modifier = Modifier
+                .width(320.dp)
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(28.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FilterList,
+                        contentDescription = null,
+                        tint = NetflixRed.copy(alpha = 0.8f),
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Arama Sonucu Bulunamadı",
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Girdiğiniz kelimeye veya seçilen filtreye uygun yayın bulunamadı. Lütfen aramayı düzenleyin.",
+                    color = Color.Gray,
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
     }
 }

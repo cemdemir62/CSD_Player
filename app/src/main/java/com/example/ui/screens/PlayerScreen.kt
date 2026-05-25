@@ -1584,13 +1584,22 @@ fun PlayerScreen(
         ) {
             val sidebarCloseFocusRequester = remember { FocusRequester() }
             var sidebarSearchQuery by remember { mutableStateOf("") }
+            var showVoiceSearchInSidebar by remember { mutableStateOf(false) }
             
             // Filter list based on search inside side menu
             val filteredChannels = remember(channels, sidebarSearchQuery) {
                 if (sidebarSearchQuery.isEmpty()) {
                     channels
                 } else {
-                    channels.filter { it.name.contains(sidebarSearchQuery, ignoreCase = true) }
+                    val result = ArrayList<IptvChannel>()
+                    val query = sidebarSearchQuery
+                    for (chan in channels) {
+                        if (chan.name.contains(query, ignoreCase = true)) {
+                            result.add(chan)
+                            if (result.size >= 100) break
+                        }
+                    }
+                    result
                 }
             }
 
@@ -1631,24 +1640,44 @@ fun PlayerScreen(
                 }
 
                 // Search field inside sidebar
-                TextField(
+                OutlinedTextField(
                     value = sidebarSearchQuery,
                     onValueChange = { sidebarSearchQuery = it },
                     placeholder = { Text("Kanal ara...", color = Color.Gray, fontSize = 12.sp) },
                     singleLine = true,
-                    colors = TextFieldDefaults.colors(
+                    colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White,
                         focusedContainerColor = Color(0xFF1F1F1F),
                         unfocusedContainerColor = Color(0xFF1A1A1A),
-                        focusedIndicatorColor = NetflixRed,
-                        unfocusedIndicatorColor = Color.Transparent
+                        focusedBorderColor = NetflixRed,
+                        unfocusedBorderColor = Color.Transparent
                     ),
+                    trailingIcon = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (sidebarSearchQuery.isNotEmpty()) {
+                                IconButton(onClick = { sidebarSearchQuery = "" }) {
+                                    Icon(Icons.Default.Clear, null, tint = Color.LightGray, modifier = Modifier.size(14.dp))
+                                }
+                            }
+                            IconButton(onClick = { showVoiceSearchInSidebar = true }) {
+                                Icon(Icons.Default.Mic, "Sesli Arama", tint = NetflixRed, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 12.dp),
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp)
                 )
+
+                if (showVoiceSearchInSidebar) {
+                    VoiceSearchDialog(
+                        isTvMode = isTvMode,
+                        onDismissRequest = { showVoiceSearchInSidebar = false },
+                        onResult = { sidebarSearchQuery = it }
+                    )
+                }
 
                 // Channel lists matching currently selected categories
                 if (filteredChannels.isEmpty()) {

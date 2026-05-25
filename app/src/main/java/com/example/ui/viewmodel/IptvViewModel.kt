@@ -12,6 +12,7 @@ import com.example.data.repository.IptvRepository
 import com.example.data.model.XtreamSeason
 import com.example.data.model.XtreamEpisode
 import com.example.data.network.XtreamService
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -87,7 +88,8 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             repository.getGroupsByType(playlistId, type)
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.flowOn(Dispatchers.Default)
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Dizi Detay & Bölüm Seçim Ekranı Durumları
     private val _activeSeriesChannel = MutableStateFlow<IptvChannel?>(null)
@@ -245,7 +247,8 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
             group == null || group == "Hepsi" -> repository.getChannelsByType(playlistId, type)
             else -> repository.getChannelsByGroup(playlistId, type, group)
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.flowOn(Dispatchers.Default)
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun selectPlaylist(playlist: Playlist?) {
         _selectedPlaylist.value = playlist

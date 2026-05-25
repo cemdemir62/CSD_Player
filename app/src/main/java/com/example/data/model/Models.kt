@@ -19,9 +19,10 @@ data class Playlist(
 @Entity(
     tableName = "iptv_channels",
     indices = [
-        Index(value = ["playlistId", "type", "groupTitle"]),
-        Index(value = ["playlistId", "isFavorite"]),
-        Index(value = ["playlistId", "isRecent"])
+        Index(value = ["playlistId", "type", "name"]),
+        Index(value = ["playlistId", "type", "groupTitle", "name"]),
+        Index(value = ["playlistId", "isFavorite", "name"]),
+        Index(value = ["playlistId", "isRecent", "lastWatchedTimestamp"])
     ]
 )
 data class IptvChannel(
