@@ -208,7 +208,7 @@ fun SeriesDetailOverlay(
                             )
 
                             Text(
-                                text = "${seasons.size} Sezon • Google AI Studio IPTV",
+                                text = "${seasons.size} Sezon",
                                 color = Color.Gray,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -423,7 +423,7 @@ fun SeriesDetailOverlay(
                                 )
 
                                 Text(
-                                    text = "${seasons.size} Sezon • Google AI Studio IPTV",
+                                    text = "${seasons.size} Sezon",
                                     color = Color.Gray,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold

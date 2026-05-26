@@ -32,11 +32,7 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
     val configuration = LocalConfiguration.current
     
     // Choose the video based on current orientation automatically
-    val videoResId = if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-        R.raw.splash_landscape
-    } else {
-        R.raw.splash_portrait
-    }
+    val videoResId = R.raw.splash_landscape
 
     var isFinishedTriggered by remember { mutableStateOf(false) }
 

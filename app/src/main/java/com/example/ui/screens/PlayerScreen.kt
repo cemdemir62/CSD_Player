@@ -137,6 +137,22 @@ fun PlayerScreen(
         mutableStateOf(sharedPrefs.getBoolean("low_latency_mode", true))
     }
 
+    val errorRetryFocusRequester = remember { FocusRequester() }
+
+    androidx.activity.compose.BackHandler(enabled = hasError) {
+        onBack()
+    }
+
+    LaunchedEffect(hasError) {
+        if (hasError) {
+            try {
+                errorRetryFocusRequester.requestFocus()
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+    }
+
     val performZapping: (Boolean) -> Unit = { isNext ->
         if (zapLockCategory) {
             val currentGroup = channel.groupTitle
@@ -742,6 +758,9 @@ fun PlayerScreen(
                     )
                     Spacer(modifier = Modifier.height(24.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        val retryInteractionSource = remember { MutableInteractionSource() }
+                        val exitInteractionSource = remember { MutableInteractionSource() }
+
                         Button(
                             onClick = {
                                 hasError = false
@@ -749,14 +768,26 @@ fun PlayerScreen(
                                 exoPlayer.prepare()
                                 exoPlayer.play()
                             },
+                            interactionSource = retryInteractionSource,
                             colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
-                            modifier = Modifier.testTag("player_retry_button")
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .focusRequester(errorRetryFocusRequester)
+                                .focusable(interactionSource = retryInteractionSource)
+                                .tvFocusBorder(isTvMode = isTvMode, interactionSource = retryInteractionSource)
+                                .testTag("player_retry_button")
                         ) {
                             Text("Yeniden Dene", color = Color.White)
                         }
                         Button(
                             onClick = onBack,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                            interactionSource = exitInteractionSource,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .focusable(interactionSource = exitInteractionSource)
+                                .tvFocusBorder(isTvMode = isTvMode, interactionSource = exitInteractionSource)
+                                .testTag("player_exit_button")
                         ) {
                             Text("Çıkış Yap", color = Color.White)
                         }
