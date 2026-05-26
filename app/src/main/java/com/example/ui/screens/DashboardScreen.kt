@@ -700,14 +700,6 @@ fun TvDashboard(
                     ) {
                         Icon(Icons.Default.Refresh, "Yenile", tint = Color.White)
                     }
-                    
-                    // Mobil Moduna Dön
-                    IconButton(
-                        onClick = onResetMode,
-                        modifier = Modifier.testTag("action_reset_mode")
-                    ) {
-                        Icon(Icons.Default.PhoneAndroid, "Mobil Moduna Geç", tint = Color.White)
-                    }
 
                     // Profil Değiştir (Avatar Button)
                     val avatarColor = remember(selectedProfile.avatarColor) {

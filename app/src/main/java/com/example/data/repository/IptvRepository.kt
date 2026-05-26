@@ -37,7 +37,6 @@ class IptvRepository(private val iptvDao: IptvDao) {
 
     suspend fun refreshPlaylist(context: android.content.Context, playlistId: Long): Unit = withContext(Dispatchers.IO) {
         val playlist = iptvDao.getPlaylistById(playlistId) ?: return@withContext
-        iptvDao.deleteChannelsByPlaylist(playlistId)
 
         val channels = if (playlist.type == "M3U") {
             val content = downloadUrl(playlist.url) ?: throw Exception("M3U çalma listesi indirilemedi. Bağlantı adresini kontrol edin.")
@@ -56,10 +55,8 @@ class IptvRepository(private val iptvDao: IptvDao) {
             throw Exception("İçerik bulunamadı veya parse edilemedi.")
         }
 
-        // Chunk/Batch insertion (500 adetlik paketlerle veritabanına yazarak RAM ve performans tasarrufu sağlarız)
-        channels.chunked(500).forEach { chunk ->
-            iptvDao.insertChannels(chunk)
-        }
+        // Atomik transaction ile eski kanalları silip yenilerini ekleyelim, favorileri & geçmişi koruyalım!
+        iptvDao.replaceChannelsAndPreserveStats(playlistId, channels)
     }
 
     private suspend fun downloadUrl(url: String): String? = withContext(Dispatchers.IO) {

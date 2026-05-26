@@ -581,62 +581,6 @@ fun SettingsPanelContent(
                     isTvMode = isTvMode,
                     onCheckedChange = onZapLockChanged
                 )
-
-                // Split Mode Switcher in dynamic Container card
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF13131A)),
-                    border = BorderStroke(1.dp, Color(0xFF1E1E26)),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "VARSAYILAN KONTROL MODU",
-                            color = Color.Gray,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Arayüz şemasını cihazınıza göre ayarlayın. D-Pad TV modu uzaktan kumandayla yön tuşlarını odaklar, Mobil mod dokunma hareketlerine duyarlıdır.",
-                            color = Color.LightGray,
-                            fontSize = 11.sp,
-                            lineHeight = 15.sp
-                        )
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        val switchInteraction = remember { MutableInteractionSource() }
-                        Button(
-                            onClick = onResetMode,
-                            colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
-                            shape = RoundedCornerShape(10.dp),
-                            interactionSource = switchInteraction,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(42.dp)
-                                .focusable(interactionSource = switchInteraction)
-                                .tvFocusBorder(isTvMode = isTvMode, interactionSource = switchInteraction, shape = RoundedCornerShape(10.dp))
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = if (isTvMode) Icons.Default.PhoneAndroid else Icons.Default.Tv,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                val labelText = if (isTvMode) "Mobil Dokunmatik Moduna Geç" else "Televizyon (D-Pad) Moduna Geç"
-                                Text(
-                                    text = labelText,
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
             }
         }
         2 -> {

@@ -54,6 +54,36 @@ interface IptvDao {
     @Query("SELECT COUNT(*) FROM iptv_channels WHERE playlistId = :playlistId")
     suspend fun getChannelCount(playlistId: Long): Int
 
+    @Query("SELECT * FROM iptv_channels WHERE playlistId = :playlistId AND (isFavorite = 1 OR isRecent = 1)")
+    suspend fun getFavoritesAndRecents(playlistId: Long): List<IptvChannel>
+
+    @Transaction
+    suspend fun replaceChannelsAndPreserveStats(playlistId: Long, newChannels: List<IptvChannel>) {
+        val favsAndRecents = getFavoritesAndRecents(playlistId)
+        val favsSet = favsAndRecents.filter { it.isFavorite }.map { it.uniqueId }.toSet()
+        val recentsMap = favsAndRecents.filter { it.isRecent }.associate { it.uniqueId to it.lastWatchedTimestamp }
+
+        deleteChannelsByPlaylist(playlistId)
+
+        val updatedChannels = newChannels.map { channel ->
+            val fav = favsSet.contains(channel.uniqueId)
+            val recentTimestamp = recentsMap[channel.uniqueId]
+            if (fav || recentTimestamp != null) {
+                channel.copy(
+                    isFavorite = fav,
+                    isRecent = recentTimestamp != null,
+                    lastWatchedTimestamp = recentTimestamp ?: 0L
+                )
+            } else {
+                channel
+            }
+        }
+
+        updatedChannels.chunked(500).forEach { chunk ->
+            insertChannels(chunk)
+        }
+    }
+
     @Query("SELECT * FROM iptv_channels WHERE uniqueId IN (:ids)")
     suspend fun getChannelsByUniqueIds(ids: List<String>): List<IptvChannel>
 

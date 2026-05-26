@@ -75,8 +75,8 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
     val playlists: StateFlow<List<Playlist>> = repository.playlists
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Uygulama Modu: "TV" (D-Pad Kumanda) veya "MOBIL" (Touch) - null ise seçim ekranına yönlendirilir
-    private val _appMode = MutableStateFlow<String?>(sharedPrefs.getString("app_mode", null))
+    // Uygulama Modu: Daima "TV" (Sadece TV desteği, Mobil kaldırıldı)
+    private val _appMode = MutableStateFlow<String?>("TV")
     val appMode: StateFlow<String?> = _appMode.asStateFlow()
 
     private var hasAutoLoggedIn = false
@@ -149,6 +149,9 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
     private val _seriesFetchError = MutableStateFlow<String?>(null)
     val seriesFetchError = _seriesFetchError.asStateFlow()
 
+    // Jet Hızı: XTREAM Dizi detayları ve bölümlerini bellekte önbelleğe alıyoruz (tekrar yükleme sıfır gecikme)
+    private val seriesCache = java.util.concurrent.ConcurrentHashMap<String, Pair<List<XtreamSeason>, Map<Int, List<XtreamEpisode>>>>()
+
     fun selectSeries(channel: IptvChannel?) {
         _activeSeriesChannel.value = channel
         _seriesSeasons.value = emptyList()
@@ -168,9 +171,29 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun fetchSeriesInfo(playlist: Playlist, channel: IptvChannel) {
         val seriesId = channel.channelId
+        val cacheKey = "${playlist.id}_$seriesId"
         viewModelScope.launch {
             _isFetchingSeriesInfo.value = true
             _seriesFetchError.value = null
+            
+            // Jet Hızı Önbellek Sorgulama: Daha önce çekilmişse direkt yükle, bekletme!
+            val cached = seriesCache[cacheKey]
+            if (cached != null) {
+                _seriesSeasons.value = cached.first
+                _seriesEpisodes.value = cached.second
+                
+                val savedSeasonNum = sharedPrefs.getInt("series_${channel.uniqueId}_last_season", -1)
+                if (savedSeasonNum != -1 && cached.first.any { it.seasonNumber == savedSeasonNum }) {
+                    _selectedSeasonNum.value = savedSeasonNum
+                } else if (cached.first.isNotEmpty()) {
+                    _selectedSeasonNum.value = cached.first.first().seasonNumber
+                } else {
+                    _selectedSeasonNum.value = 1
+                }
+                _isFetchingSeriesInfo.value = false
+                return@launch
+            }
+
             try {
                 val jsonStr = XtreamService.fetchSeriesInfo(
                     baseUrl = playlist.url,
@@ -243,6 +266,9 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     _seriesEpisodes.value = epMap
                     
+                    // Jet Hızı Önbelleğe Kaydet:
+                    seriesCache[cacheKey] = Pair(seasonsList, epMap)
+                    
                     // Set default season to last watched season or first available
                     val savedSeasonNum = sharedPrefs.getInt("series_${channel.uniqueId}_last_season", -1)
                     if (savedSeasonNum != -1 && seasonsList.any { it.seasonNumber == savedSeasonNum }) {
@@ -265,11 +291,12 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Filtreleme, arama ve gruplara göre canlı güncellenen dinamik kanal akışı
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
     val channels: StateFlow<List<IptvChannel>> = combine(
         _selectedPlaylist,
         _selectedType,
         _selectedGroup,
-        _searchQuery
+        _searchQuery.debounce { if (it.isEmpty()) 0L else 250L }
     ) { playlist, type, group, query ->
         Triple(playlist, type, group) to query
     }.flatMapLatest { (triple, query) ->
@@ -333,14 +360,23 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
                 // Jet hızında açılış: Cache zaten veritabanında var, kullanıcıyı bekletmiyoruz!
                 _syncState.value = SyncState.Synced(lastSync)
                 
-                // Son senkronizasyon üzerinden 10 dakikadan az geçmişse yeni bir planlı senkronizasyonu atlayalılm
-                if (now - lastSync < 10 * 60 * 1000) {
+                // Güvenli ve Akıllı Arka Plan Senkronizasyonu (Farklı Gün Kontrolü)
+                val lastCal = java.util.Calendar.getInstance().apply { timeInMillis = lastSync }
+                val nowCal = java.util.Calendar.getInstance().apply { timeInMillis = now }
+                val isDifferentDay = lastSync == 0L || 
+                        lastCal.get(java.util.Calendar.YEAR) != nowCal.get(java.util.Calendar.YEAR) ||
+                        lastCal.get(java.util.Calendar.DAY_OF_YEAR) != nowCal.get(java.util.Calendar.DAY_OF_YEAR)
+                
+                // Aynı günde isek ve son senkronizasyon üzerinden 30 dakikadan az geçmişse yeni senkronizasyonu atlayalım
+                if (!isDifferentDay && (now - lastSync < 30 * 60 * 1000)) {
+                    Log.d("IptvViewModel", "Aynı gün ve son senkronizasyon 30 dakikadan kısa süre önce yapılmış. Arka plan senkronizasyonu atlanıyor.")
                     return@launch
                 }
                 
                 // Arka planda sessizce cihaz verilerini güncelleyelim (Smart Sync)
                 _syncState.value = SyncState.Syncing
                 try {
+                    Log.d("IptvViewModel", "Akıllı arka plan güncellemesi başlatılıyor... Farklı gün mü? $isDifferentDay")
                     repository.refreshPlaylist(getApplication(), playlist.id)
                     sharedPrefs.edit().putLong("playlist_sync_${playlist.id}", now).apply()
                     _syncState.value = SyncState.Synced(now)
@@ -381,13 +417,14 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setAppMode(mode: String) {
-        sharedPrefs.edit().putString("app_mode", mode).apply()
-        _appMode.value = mode
+        sharedPrefs.edit().putString("app_mode", "TV").apply()
+        _appMode.value = "TV"
     }
 
     fun resetAppMode() {
-        sharedPrefs.edit().remove("app_mode").apply()
-        _appMode.value = null
+        // App is strictly TV-only, resetting to null is disabled to prevent going back to selection screens
+        sharedPrefs.edit().putString("app_mode", "TV").apply()
+        _appMode.value = "TV"
     }
 
     fun addPlaylist(name: String, type: String, url: String, user: String?, pass: String?) {
