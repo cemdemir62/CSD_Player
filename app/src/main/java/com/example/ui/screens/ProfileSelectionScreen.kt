@@ -151,28 +151,33 @@ fun ProfileSelectionScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Manage/Exit edit mode button
-                Button(
+                Surface(
                     onClick = { isManageMode = !isManageMode },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isManageMode) NetflixRed else Color(0xFF202023),
-                        contentColor = Color.White
-                    ),
                     shape = RoundedCornerShape(12.dp),
+                    color = if (isManageMode) NetflixRed else Color(0xFF202023),
                     modifier = Modifier
                         .height(48.dp)
-                        .tvClickable(isTvMode = isTvMode) {}
+                        .tvClickable(isTvMode = isTvMode) { isManageMode = !isManageMode }
                 ) {
-                    Icon(
-                        imageVector = if (isManageMode) Icons.Default.Check else Icons.Default.Edit,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isManageMode) "Tamam" else "Profilleri Yönet",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isManageMode) Icons.Default.Check else Icons.Default.Edit,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isManageMode) "Tamam" else "Profilleri Yönet",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
                 }
             }
         }

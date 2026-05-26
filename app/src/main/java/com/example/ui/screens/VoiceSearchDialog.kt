@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.Manifest
+import android.util.Log
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -82,94 +83,101 @@ fun VoiceSearchDialog(
         }
     }
 
-    // Speech Recognizer activation wrapper
+    // Speech Recognizer activation wrapper with robust main-thread dispatching & Throwable protection
     var triggerCount by remember { mutableStateOf(1) }
     DisposableEffect(hasPermission, triggerCount) {
         var speechRecognizer: SpeechRecognizer? = null
-        if (hasPermission && SpeechRecognizer.isRecognitionAvailable(context)) {
-            try {
-                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
-                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR")
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "tr-TR")
-                        putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        if (hasPermission) {
+            val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+            mainHandler.post {
+                try {
+                    if (SpeechRecognizer.isRecognitionAvailable(context)) {
+                        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR")
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "tr-TR")
+                                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                            }
+
+                            setRecognitionListener(object : RecognitionListener {
+                                override fun onReadyForSpeech(params: Bundle?) {
+                                    isListening = true
+                                    statusText = "Sizi dinliyorum, konuşun..."
+                                }
+
+                                override fun onBeginningOfSpeech() {
+                                    statusText = "Ses algılanıyor..."
+                                }
+
+                                override fun onRmsChanged(rmsdB: Float) {}
+
+                                override fun onBufferReceived(buffer: ByteArray?) {}
+
+                                override fun onEndOfSpeech() {
+                                    statusText = "Ses çözümleniyor..."
+                                }
+
+                                override fun onError(error: Int) {
+                                    val message = when (error) {
+                                        SpeechRecognizer.ERROR_AUDIO -> "Ses kayıt hatası"
+                                        SpeechRecognizer.ERROR_CLIENT -> "Sistem servis bağlantı hatası"
+                                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Mikrofon izni yetersiz"
+                                        SpeechRecognizer.ERROR_NETWORK -> "İnternet bağlantı hatası"
+                                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Bağlantı zaman aşımı"
+                                        SpeechRecognizer.ERROR_NO_MATCH -> "Ses anlaşılamadı, lütfen tekrar deneyin"
+                                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Ses tanıma sistemi meşgul"
+                                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Herhangi bir ses duyulmadı"
+                                        else -> "Cihaz sesi algılayamadı"
+                                    }
+                                    statusText = message
+                                    isListening = false
+                                }
+
+                                override fun onResults(results: Bundle?) {
+                                    isListening = false
+                                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                                    if (!matches.isNullOrEmpty()) {
+                                        val text = matches[0]
+                                        recognizedText = text
+                                        statusText = "Algılandı: $text"
+                                        onResult(text)
+                                        onDismissRequest()
+                                    }
+                                }
+
+                                override fun onPartialResults(partialResults: Bundle?) {
+                                    val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                                    if (!matches.isNullOrEmpty()) {
+                                        recognizedText = matches[0]
+                                    }
+                                }
+
+                                override fun onEvent(eventType: Int, params: Bundle?) {}
+                            })
+
+                            startListening(intent)
+                        }
+                    } else {
+                        statusText = "Cihazınızda Google Ses Servisleri bulunamadı. Lütfen aşağıdaki hazır arama önerilerini kullanın."
                     }
-
-                    setRecognitionListener(object : RecognitionListener {
-                        override fun onReadyForSpeech(params: Bundle?) {
-                            isListening = true
-                            statusText = "Sizi dinliyorum, konuşun..."
-                        }
-
-                        override fun onBeginningOfSpeech() {
-                            statusText = "Ses algılanıyor..."
-                        }
-
-                        override fun onRmsChanged(rmsdB: Float) {
-                            // Can be used for extra fluid dynamic elements
-                        }
-
-                        override fun onBufferReceived(buffer: ByteArray?) {}
-
-                        override fun onEndOfSpeech() {
-                            statusText = "Ses çözümleniyor..."
-                        }
-
-                        override fun onError(error: Int) {
-                            val message = when (error) {
-                                SpeechRecognizer.ERROR_AUDIO -> "Ses kayıt hatası"
-                                SpeechRecognizer.ERROR_CLIENT -> "Sistem servis bağlantı hatası"
-                                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Mikrofon izni yetersiz"
-                                SpeechRecognizer.ERROR_NETWORK -> "İnternet bağlantı hatası"
-                                SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Bağlantı zaman aşımı"
-                                SpeechRecognizer.ERROR_NO_MATCH -> "Ses anlaşılamadı, lütfen tekrar deneyin"
-                                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Ses tanıma sistemi meşgul"
-                                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Herhangi bir ses duyulmadı"
-                                else -> "Cihaz sesi algılayamadı"
-                            }
-                            statusText = "$message"
-                            isListening = false
-                        }
-
-                        override fun onResults(results: Bundle?) {
-                            isListening = false
-                            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                            if (!matches.isNullOrEmpty()) {
-                                val text = matches[0]
-                                recognizedText = text
-                                statusText = "Algılandı: $text"
-                                onResult(text)
-                                onDismissRequest()
-                            }
-                        }
-
-                        override fun onPartialResults(partialResults: Bundle?) {
-                            val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                            if (!matches.isNullOrEmpty()) {
-                                recognizedText = matches[0]
-                            }
-                        }
-
-                        override fun onEvent(eventType: Int, params: Bundle?) {}
-                    })
-
-                    startListening(intent)
+                } catch (e: Throwable) {
+                    statusText = "Ses tanımlama başlatılamadı veya desteklenmiyor."
+                    Log.e("VoiceSearchDialog", "Speech Recognizer error: ${e.message}", e)
                 }
-            } catch (e: Exception) {
-                statusText = "Ses tanımlama başlatılamadı: ${e.localizedMessage}"
             }
-        } else if (hasPermission) {
-            statusText = "Cihazınızda Google Ses Servisleri bulunamadı. Lütfen aşağıdaki hazır arama önerilerini kullanın."
         }
 
         onDispose {
-            try {
-                speechRecognizer?.stopListening()
-                speechRecognizer?.destroy()
-            } catch (e: Exception) {
-                // Ignore destruction issues safely
+            val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+            mainHandler.post {
+                try {
+                    speechRecognizer?.stopListening()
+                    speechRecognizer?.destroy()
+                } catch (e: Throwable) {
+                    // Ignore destruction issues safely
+                }
             }
         }
     }
@@ -241,13 +249,11 @@ fun VoiceSearchDialog(
                         )
                     }
 
-                    val closeInteraction = remember { MutableInteractionSource() }
                     IconButton(
                         onClick = onDismissRequest,
                         modifier = Modifier
                             .size(36.dp)
-                            .focusable(interactionSource = closeInteraction)
-                            .tvFocusBorder(isTvMode, closeInteraction, CircleShape)
+                            .tvClickable(isTvMode, CircleShape) { onDismissRequest() }
                     ) {
                         Icon(Icons.Default.Close, "Kapat", tint = Color.LightGray, modifier = Modifier.size(18.dp))
                     }
@@ -272,7 +278,6 @@ fun VoiceSearchDialog(
                     }
 
                     // Main Recording Button
-                    val triggerInteraction = remember { MutableInteractionSource() }
                     Box(
                         modifier = Modifier
                             .size(72.dp)
@@ -282,8 +287,6 @@ fun VoiceSearchDialog(
                                     colors = listOf(NetflixRed, Color(0xFFB1070F))
                                 )
                             )
-                            .focusable(interactionSource = triggerInteraction)
-                            .tvFocusBorder(isTvMode, triggerInteraction, CircleShape)
                             .tvClickable(isTvMode, CircleShape) {
                                 triggerCount++
                             },
@@ -356,7 +359,6 @@ fun VoiceSearchDialog(
                         .height(84.dp)
                 ) {
                     items(suggestions) { keyword ->
-                        val itemInteraction = remember { MutableInteractionSource() }
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = Color(0xFF141416),
@@ -364,8 +366,6 @@ fun VoiceSearchDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(38.dp)
-                                .focusable(interactionSource = itemInteraction)
-                                .tvFocusBorder(isTvMode, itemInteraction, RoundedCornerShape(10.dp))
                                 .tvClickable(isTvMode, RoundedCornerShape(10.dp)) {
                                     onResult(keyword)
                                     onDismissRequest()
@@ -395,33 +395,44 @@ fun VoiceSearchDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val retryInteraction = remember { MutableInteractionSource() }
-                    OutlinedButton(
-                        onClick = { triggerCount++ },
+                    Surface(
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                        color = Color(0xFF141416),
                         border = BorderStroke(1.dp, Color.DarkGray),
                         modifier = Modifier
                             .weight(1f)
-                            .focusable(interactionSource = retryInteraction)
-                            .tvFocusBorder(isTvMode, retryInteraction, RoundedCornerShape(12.dp))
+                            .height(44.dp)
+                            .tvClickable(isTvMode, RoundedCornerShape(12.dp)) {
+                                triggerCount++
+                            }
                     ) {
-                        Icon(Icons.Default.Refresh, "Tekrar Dene", modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Yeniden Başlat", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Icon(Icons.Default.Refresh, "Tekrar Dene", modifier = Modifier.size(16.dp), tint = Color.White)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Yeniden Başlat", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
 
-                    val cancelInteraction = remember { MutableInteractionSource() }
-                    Button(
-                        onClick = onDismissRequest,
+                    Surface(
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
+                        color = NetflixRed,
                         modifier = Modifier
                             .weight(1f)
-                            .focusable(interactionSource = cancelInteraction)
-                            .tvFocusBorder(isTvMode, cancelInteraction, RoundedCornerShape(12.dp))
+                            .height(44.dp)
+                            .tvClickable(isTvMode, RoundedCornerShape(12.dp)) {
+                                onDismissRequest()
+                            }
                     ) {
-                        Text("Kapat", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Text("Kapat", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }

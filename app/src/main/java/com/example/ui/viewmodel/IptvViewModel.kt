@@ -25,12 +25,22 @@ sealed interface RefreshState {
     data class Error(val message: String) : RefreshState
 }
 
+sealed interface SyncState {
+    object Idle : SyncState
+    object Syncing : SyncState
+    data class Synced(val lastSyncTime: Long) : SyncState
+    data class Error(val message: String, val lastSyncTime: Long?) : SyncState
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class IptvViewModel(application: Application) : AndroidViewModel(application) {
 
     private val sharedPrefs = application.getSharedPreferences("zula_iptv_prefs", Context.MODE_PRIVATE)
     private val database = AppDatabase.getDatabase(application)
     private val repository = IptvRepository(database.iptvDao())
+
+    private val _syncState = MutableStateFlow<SyncState>(SyncState.Idle)
+    val syncState = _syncState.asStateFlow()
 
     // 1. Profil Yönetim Yapıları
     private val _profiles = MutableStateFlow<List<UserProfile>>(emptyList())
@@ -84,7 +94,7 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
                         list.firstOrNull()
                     }
                     if (toSelect != null) {
-                        _selectedPlaylist.value = toSelect
+                        selectPlaylist(toSelect)
                     }
                     hasAutoLoggedIn = true
                 }
@@ -306,6 +316,54 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
         _selectedGroup.value = "Hepsi"
         _searchQuery.value = ""
         sharedPrefs.edit().putLong("last_playlist_id", playlist?.id ?: -1L).apply()
+        if (playlist != null) {
+            triggerSmartSync(playlist)
+        } else {
+            _syncState.value = SyncState.Idle
+        }
+    }
+
+    fun triggerSmartSync(playlist: Playlist) {
+        viewModelScope.launch {
+            val count = repository.getChannelCount(playlist.id)
+            val lastSync = sharedPrefs.getLong("playlist_sync_${playlist.id}", 0L)
+            val now = System.currentTimeMillis()
+            
+            if (count > 0) {
+                // Jet hızında açılış: Cache zaten veritabanında var, kullanıcıyı bekletmiyoruz!
+                _syncState.value = SyncState.Synced(lastSync)
+                
+                // Son senkronizasyon üzerinden 10 dakikadan az geçmişse yeni bir planlı senkronizasyonu atlayalılm
+                if (now - lastSync < 10 * 60 * 1000) {
+                    return@launch
+                }
+                
+                // Arka planda sessizce cihaz verilerini güncelleyelim (Smart Sync)
+                _syncState.value = SyncState.Syncing
+                try {
+                    repository.refreshPlaylist(getApplication(), playlist.id)
+                    sharedPrefs.edit().putLong("playlist_sync_${playlist.id}", now).apply()
+                    _syncState.value = SyncState.Synced(now)
+                } catch (e: Exception) {
+                    Log.e("IptvViewModel", "Silent background sync error: ${e.message}")
+                    _syncState.value = SyncState.Error(e.message ?: "Bağlantı Hatası", lastSync)
+                }
+            } else {
+                // Yerel veritabanında hiç kanal yok: Kullanıcıya ilk yükleme göstergesi sunuyoruz.
+                _syncState.value = SyncState.Syncing
+                _refreshState.value = RefreshState.Loading("İlk kurulum senkronizasyonu yapılıyor...")
+                try {
+                    repository.refreshPlaylist(getApplication(), playlist.id)
+                    sharedPrefs.edit().putLong("playlist_sync_${playlist.id}", now).apply()
+                    _syncState.value = SyncState.Synced(now)
+                    _refreshState.value = RefreshState.Success
+                } catch (e: Exception) {
+                    Log.e("IptvViewModel", "First-time sync error: ${e.message}")
+                    _syncState.value = SyncState.Error(e.message ?: "Bağlantı Hatası", null)
+                    _refreshState.value = RefreshState.Error(e.message ?: "Çalma listesi ilk senkronizasyonu başarısız oldu.")
+                }
+            }
+        }
     }
 
     fun selectType(type: String) {
@@ -357,10 +415,17 @@ class IptvViewModel(application: Application) : AndroidViewModel(application) {
         val playlist = _selectedPlaylist.value ?: return
         viewModelScope.launch {
             _refreshState.value = RefreshState.Loading("Veriler güncelleniyor...")
+            _syncState.value = SyncState.Syncing
+            val now = System.currentTimeMillis()
             try {
                 repository.refreshPlaylist(getApplication(), playlist.id)
+                sharedPrefs.edit().putLong("playlist_sync_${playlist.id}", now).apply()
+                _syncState.value = SyncState.Synced(now)
                 _refreshState.value = RefreshState.Success
             } catch (e: Exception) {
+                val lastSync = sharedPrefs.getLong("playlist_sync_${playlist.id}", 0L)
+                val lastSyncVal = if (lastSync > 0L) lastSync else null
+                _syncState.value = SyncState.Error(e.message ?: "Güncelleme sırasında hata oluştu.", lastSyncVal)
                 _refreshState.value = RefreshState.Error(e.message ?: "Güncelleme sırasında hata oluştu.")
             }
         }

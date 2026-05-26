@@ -49,11 +49,13 @@ import com.example.data.model.UserProfile
 import com.example.ui.theme.NetflixDarkGrey
 import com.example.ui.theme.NetflixLightGrey
 import com.example.ui.theme.NetflixRed
+import com.example.ui.viewmodel.SyncState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     playlist: Playlist,
+    syncState: SyncState,
     channels: List<IptvChannel>,
     groups: List<String>,
     selectedType: String,
@@ -77,6 +79,7 @@ fun DashboardScreen(
     if (isTvMode) {
         TvDashboard(
             playlist = playlist,
+            syncState = syncState,
             channels = channels,
             groups = groups,
             selectedType = selectedType,
@@ -99,6 +102,7 @@ fun DashboardScreen(
     } else {
         MobileDashboard(
             playlist = playlist,
+            syncState = syncState,
             channels = channels,
             groups = groups,
             selectedType = selectedType,
@@ -128,6 +132,7 @@ fun DashboardScreen(
 @Composable
 fun MobileDashboard(
     playlist: Playlist,
+    syncState: SyncState,
     channels: List<IptvChannel>,
     groups: List<String>,
     selectedType: String,
@@ -223,6 +228,7 @@ fun MobileDashboard(
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
+                SyncStatusBadge(syncState = syncState)
             }
         },
         actions = {
@@ -609,6 +615,7 @@ fun MobileDashboard(
 @Composable
 fun TvDashboard(
     playlist: Playlist,
+    syncState: SyncState,
     channels: List<IptvChannel>,
     groups: List<String>,
     selectedType: String,
@@ -666,6 +673,7 @@ fun TvDashboard(
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
+                        SyncStatusBadge(syncState = syncState)
                     }
                 },
                 actions = {
@@ -709,20 +717,15 @@ fun TvDashboard(
                             NetflixRed
                         }
                     }
-                    val switchProfInteraction = remember { MutableInteractionSource() }
                     Box(
                         modifier = Modifier
                             .padding(horizontal = 6.dp)
                             .size(34.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(avatarColor)
-                            .focusable(interactionSource = switchProfInteraction)
-                            .tvFocusBorder(isTvMode = true, interactionSource = switchProfInteraction, shape = RoundedCornerShape(8.dp))
-                            .clickable(
-                                interactionSource = switchProfInteraction,
-                                indication = androidx.compose.material3.ripple(),
-                                onClick = onSwitchProfile
-                            )
+                            .tvClickable(isTvMode = true, shape = RoundedCornerShape(8.dp)) {
+                                onSwitchProfile()
+                            }
                             .testTag("action_switch_profile_tv"),
                         contentAlignment = Alignment.Center
                     ) {
@@ -820,14 +823,11 @@ fun TvDashboard(
                             .testTag("dashboard_search_input")
                     )
 
-                    val tvMicInteraction = remember { MutableInteractionSource() }
                     Box(
                         modifier = Modifier
                             .size(46.dp)
                             .clip(CircleShape)
                             .background(Color(0xFF222222))
-                            .focusable(interactionSource = tvMicInteraction)
-                            .tvFocusBorder(isTvMode = true, interactionSource = tvMicInteraction, shape = CircleShape)
                             .tvClickable(isTvMode = true, shape = CircleShape) {
                                 showVoiceSearch = true
                             }
@@ -1639,6 +1639,80 @@ fun ContinueWatchingCard(
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.padding(start = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SyncStatusBadge(syncState: SyncState) {
+    val context = LocalContext.current
+    val badgeColor = when (syncState) {
+        is SyncState.Syncing -> MaterialTheme.colorScheme.primary
+        is SyncState.Synced -> Color(0xFF4CAF50) // Green
+        is SyncState.Error -> Color(0xFFE50914) // Netflix Red
+        else -> Color.Gray
+    }
+    
+    val badgeText = when (syncState) {
+        is SyncState.Syncing -> "Senkronize Ediliyor..."
+        is SyncState.Synced -> "Senkronize Edildi"
+        is SyncState.Error -> "Kayıttan Açıldı"
+        else -> "Çevrimdışı Bellek"
+    }
+
+    val icon = when (syncState) {
+        is SyncState.Syncing -> Icons.Default.Sync
+        is SyncState.Synced -> Icons.Default.CheckCircle
+        is SyncState.Error -> Icons.Default.CloudOff
+        else -> Icons.Default.Cached
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .padding(start = 12.dp)
+            .background(badgeColor.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
+            .border(1.dp, badgeColor.copy(alpha = 0.40f), RoundedCornerShape(20.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = "Sync Durumu",
+            tint = badgeColor,
+            modifier = Modifier.size(12.dp)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = badgeText,
+            color = Color.White,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        val timestamp = when (syncState) {
+            is SyncState.Synced -> syncState.lastSyncTime
+            is SyncState.Error -> syncState.lastSyncTime
+            else -> null
+        }
+        
+        if (timestamp != null && timestamp > 0L) {
+            Spacer(modifier = Modifier.width(4.dp))
+            val timeString = remember(timestamp) {
+                try {
+                    val sdf = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                    "Son: " + sdf.format(java.util.Date(timestamp))
+                } catch (e: Exception) {
+                    ""
+                }
+            }
+            if (timeString.isNotEmpty()) {
+                Text(
+                    text = "($timeString)",
+                    color = Color.LightGray.copy(alpha = 0.8f),
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Normal
                 )
             }
         }

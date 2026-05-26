@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
                 val seriesEpisodes by viewModel.seriesEpisodes.collectAsState()
                 val continueWatchingList by viewModel.continueWatchingChannels.collectAsState()
                 val continueWatchingData by viewModel.continueWatchingData.collectAsState()
+                val syncState by viewModel.syncState.collectAsState()
 
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     // Android sistem çubuğu (Edge-to-Edge) insets padding değerlerini alarak,
@@ -129,7 +130,8 @@ class MainActivity : ComponentActivity() {
                                 val sharedPrefs = remember(context) { context.getSharedPreferences("zula_iptv_prefs", android.content.Context.MODE_PRIVATE) }
                                 
                                 var onNextEp: (() -> Unit)? = null
-                                if (channel.type == "SERIES" && activeSeriesChannel != null) {
+                                val currentPlaylistLocal = selectedPlaylist
+                                if (channel.type == "SERIES" && activeSeriesChannel != null && currentPlaylistLocal != null) {
                                     var currentSeasonNum: Int? = null
                                     var currentEpIndex: Int? = null
                                     
@@ -173,8 +175,8 @@ class MainActivity : ComponentActivity() {
                                                     .apply()
                                                 
                                                 val nextTempChannel = IptvChannel(
-                                                    uniqueId = "${selectedPlaylist!!.id}_episode_${nextEp.id}",
-                                                    playlistId = selectedPlaylist!!.id,
+                                                    uniqueId = "${currentPlaylistLocal.id}_episode_${nextEp.id}",
+                                                    playlistId = currentPlaylistLocal.id,
                                                     channelId = nextEp.id,
                                                     name = "${activeSeriesChannel!!.name} - ${nextSeasonObj.name} Bölüm ${nextEp.episodeNum} : ${nextEp.name}",
                                                     streamUrl = nextEp.streamUrl,
@@ -234,102 +236,108 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
 
-                                Box(modifier = Modifier.fillMaxSize()) {
-                                    DashboardScreen(
-                                        playlist = selectedPlaylist!!,
-                                        channels = channels,
-                                        groups = groups,
-                                        selectedType = selectedType,
-                                        selectedGroup = selectedGroup,
-                                        searchQuery = searchQuery,
-                                        isTvMode = isTv,
-                                        selectedProfile = selectedProfile!!,
-                                        onSwitchProfile = { viewModel.selectProfile(null) },
-                                        continueWatchingList = continueWatchingList,
-                                        continueWatchingProgress = continueWatchingData,
-                                        onRemoveContinueWatching = { channel ->
-                                            viewModel.removeFromContinueWatching(channel.uniqueId)
-                                        },
-                                        onTypeSelected = { type ->
-                                            viewModel.selectType(type)
-                                        },
-                                        onGroupSelected = { group ->
-                                            viewModel.selectGroup(group)
-                                        },
-                                        onSearchChanged = { query ->
-                                            viewModel.setSearchQuery(query)
-                                        },
-                                        onChannelSelected = { channel ->
-                                            if (channel.type == "SERIES" && selectedPlaylist!!.type == "XTREAM") {
-                                                viewModel.selectSeries(channel)
-                                            } else {
-                                                viewModel.selectChannel(channel)
-                                            }
-                                        },
-                                        onToggleFavorite = { channel ->
-                                            viewModel.toggleFavorite(channel)
-                                        },
-                                        onDisconnect = {
-                                            viewModel.selectPlaylist(null)
-                                        },
-                                        onResetMode = {
-                                            viewModel.resetAppMode()
-                                        },
-                                        onRefreshPlaylist = {
-                                            viewModel.refreshActivePlaylist()
-                                        }
-                                    )
+                                val currentPlaylistLocal = selectedPlaylist
+                                val currentProfileLocal = selectedProfile
 
-                                    // Dizi Detay & Bölüm Seçim Ekranı Overlay'i
-                                    activeSeriesChannel?.let { series ->
-                                        val context = LocalContext.current
-                                        val sharedPrefs = remember(context) { context.getSharedPreferences("zula_iptv_prefs", android.content.Context.MODE_PRIVATE) }
-                                        var lastWatchedEpisodeId by remember(series.uniqueId) {
-                                            mutableStateOf(sharedPrefs.getString("series_${series.uniqueId}_last_episode_id", null))
-                                        }
-
-                                        val selectedSeasonNum by viewModel.selectedSeasonNum.collectAsState()
-                                        val isFetchingSeries by viewModel.isFetchingSeriesInfo.collectAsState()
-                                        val seriesFetchError by viewModel.seriesFetchError.collectAsState()
-
-                                        SeriesDetailOverlay(
-                                            series = series,
-                                            seasons = seriesSeasons,
-                                            episodesBySeason = seriesEpisodes,
-                                            selectedSeasonNum = selectedSeasonNum,
-                                            isLoading = isFetchingSeries,
-                                            error = seriesFetchError,
+                                if (currentPlaylistLocal != null && currentProfileLocal != null) {
+                                    Box(modifier = Modifier.fillMaxSize()) {
+                                        DashboardScreen(
+                                            playlist = currentPlaylistLocal,
+                                            syncState = syncState,
+                                            channels = channels,
+                                            groups = groups,
+                                            selectedType = selectedType,
+                                            selectedGroup = selectedGroup,
+                                            searchQuery = searchQuery,
                                             isTvMode = isTv,
-                                            lastWatchedEpisodeId = lastWatchedEpisodeId,
-                                            onSeasonSelected = { seasonNum ->
-                                                viewModel.selectSeasonNum(seasonNum)
+                                            selectedProfile = currentProfileLocal,
+                                            onSwitchProfile = { viewModel.selectProfile(null) },
+                                            continueWatchingList = continueWatchingList,
+                                            continueWatchingProgress = continueWatchingData,
+                                            onRemoveContinueWatching = { channel ->
+                                                viewModel.removeFromContinueWatching(channel.uniqueId)
                                             },
-                                            onEpisodeSelected = { seasonObj, episode ->
-                                                // Kaldığı bölümü ve sezonu kaydet (Resume info)
-                                                sharedPrefs.edit()
-                                                    .putInt("series_${series.uniqueId}_last_season", seasonObj.seasonNumber)
-                                                    .putString("series_${series.uniqueId}_last_episode_id", episode.id)
-                                                    .apply()
-
-                                                lastWatchedEpisodeId = episode.id
-
-                                                // Bölüm geçici bir IptvChannel olarak oynatılır
-                                                val tempEpisodeChannel = IptvChannel(
-                                                    uniqueId = "${selectedPlaylist!!.id}_episode_${episode.id}",
-                                                    playlistId = selectedPlaylist!!.id,
-                                                    channelId = episode.id,
-                                                    name = "${series.name} - ${seasonObj.name} Bölüm ${episode.episodeNum} : ${episode.name}",
-                                                    streamUrl = episode.streamUrl,
-                                                    logoUrl = series.logoUrl ?: episode.logoUrl,
-                                                    groupTitle = series.groupTitle,
-                                                    type = "SERIES"
-                                                )
-                                                viewModel.selectChannel(tempEpisodeChannel)
+                                            onTypeSelected = { type ->
+                                                viewModel.selectType(type)
                                             },
-                                            onClose = {
-                                                viewModel.selectSeries(null)
+                                            onGroupSelected = { group ->
+                                                viewModel.selectGroup(group)
+                                            },
+                                            onSearchChanged = { query ->
+                                                viewModel.setSearchQuery(query)
+                                            },
+                                            onChannelSelected = { channel ->
+                                                if (channel.type == "SERIES" && currentPlaylistLocal.type == "XTREAM") {
+                                                    viewModel.selectSeries(channel)
+                                                } else {
+                                                    viewModel.selectChannel(channel)
+                                                }
+                                            },
+                                            onToggleFavorite = { channel ->
+                                                viewModel.toggleFavorite(channel)
+                                            },
+                                            onDisconnect = {
+                                                viewModel.selectPlaylist(null)
+                                            },
+                                            onResetMode = {
+                                                viewModel.resetAppMode()
+                                            },
+                                            onRefreshPlaylist = {
+                                                viewModel.refreshActivePlaylist()
                                             }
                                         )
+
+                                        // Dizi Detay & Bölüm Seçim Ekranı Overlay'i
+                                        activeSeriesChannel?.let { series ->
+                                            val context = LocalContext.current
+                                            val sharedPrefs = remember(context) { context.getSharedPreferences("zula_iptv_prefs", android.content.Context.MODE_PRIVATE) }
+                                            var lastWatchedEpisodeId by remember(series.uniqueId) {
+                                                mutableStateOf(sharedPrefs.getString("series_${series.uniqueId}_last_episode_id", null))
+                                            }
+
+                                            val selectedSeasonNum by viewModel.selectedSeasonNum.collectAsState()
+                                            val isFetchingSeries by viewModel.isFetchingSeriesInfo.collectAsState()
+                                            val seriesFetchError by viewModel.seriesFetchError.collectAsState()
+
+                                            SeriesDetailOverlay(
+                                                series = series,
+                                                seasons = seriesSeasons,
+                                                episodesBySeason = seriesEpisodes,
+                                                selectedSeasonNum = selectedSeasonNum,
+                                                isLoading = isFetchingSeries,
+                                                error = seriesFetchError,
+                                                isTvMode = isTv,
+                                                lastWatchedEpisodeId = lastWatchedEpisodeId,
+                                                onSeasonSelected = { seasonNum ->
+                                                    viewModel.selectSeasonNum(seasonNum)
+                                                },
+                                                onEpisodeSelected = { seasonObj, episode ->
+                                                    // Kaldığı bölümü ve sezonu kaydet (Resume info)
+                                                    sharedPrefs.edit()
+                                                        .putInt("series_${series.uniqueId}_last_season", seasonObj.seasonNumber)
+                                                        .putString("series_${series.uniqueId}_last_episode_id", episode.id)
+                                                        .apply()
+
+                                                    lastWatchedEpisodeId = episode.id
+
+                                                    // Bölüm geçici bir IptvChannel olarak oynatılır
+                                                    val tempEpisodeChannel = IptvChannel(
+                                                        uniqueId = "${currentPlaylistLocal.id}_episode_${episode.id}",
+                                                        playlistId = currentPlaylistLocal.id,
+                                                        channelId = episode.id,
+                                                        name = "${series.name} - ${seasonObj.name} Bölüm ${episode.episodeNum} : ${episode.name}",
+                                                        streamUrl = episode.streamUrl,
+                                                        logoUrl = series.logoUrl ?: episode.logoUrl,
+                                                        groupTitle = series.groupTitle,
+                                                        type = "SERIES"
+                                                    )
+                                                    viewModel.selectChannel(tempEpisodeChannel)
+                                                },
+                                                onClose = {
+                                                    viewModel.selectSeries(null)
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
